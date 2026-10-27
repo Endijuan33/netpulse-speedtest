@@ -117,7 +117,7 @@ async function pingSamples(
 /**
  * Download measurement — long streams, not small chunks (round 3 fix).
  *
- * Why the old engine capped near ~20 Mbps on the user's phone (Ookla/Google
+ * Why the old engine capped near ~20 Mbps on the user's phone (other tools
  * on the same phone: 200+ Mbps): it fetched sequential 1–32 MB chunks with
  * 4 workers, so every chunk paid a full round trip to the Vercel region
  * (iad1, US East) plus a fresh serverless invocation, and the chunk size was
@@ -140,9 +140,9 @@ async function pingSamples(
  * counted wholly on the side its read completed — a documented, sub-chunk
  * approximation, not a fudge of the total.
  *
- * Honest geography caveat (also shown in the UI): the test server is the
- * Vercel deployment region (iad1, US East) while Ookla/Google used a
- * Jakarta-local server for this user, so some gap vs Ookla is RTT, not
+ * Honest geography caveat: the test server is the
+ * Vercel deployment region (iad1, US East) while the comparison tools used a
+ * Jakarta-local server for this user, so some gap vs those tools is RTT, not
  * engine — but the engine no longer adds its own ~20 Mbps ceiling on top.
  */
 async function measureDownload(

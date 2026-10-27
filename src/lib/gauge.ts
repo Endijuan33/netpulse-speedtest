@@ -15,11 +15,11 @@
  * normalized value below, and the arc uses pathLength=100 so dashoffset is
  * exactly 100 * (1 - norm) — no hardcoded dasharray guesswork.
  *
- * Scale: Ookla-style logarithmic spacing over a FIXED 0–1000 Mbps range.
+ * Scale: logarithmic spacing over a FIXED 0–1000 Mbps range.
  * A linear 0–1000 gauge barely moves below 100 Mbps and the old adaptive
  * max (ceil(value/100)*100) made the needle jump BACKWARDS as the max grew
  * mid-test. Log spacing (norm = log10(1+v) / log10(1+1000)) puts 20 Mbps at
- * ~44% of sweep and 200 Mbps at ~77%, matching Ookla's mark spacing, and
+ * ~44% of sweep and 200 Mbps at ~77%, with log-spaced marks, and
  * the fixed max removes the backwards-jump entirely. The displayed number
  * is always the true linear Mbps; only the needle/arc position is log.
  */

@@ -152,11 +152,25 @@ test("round 3: dark mode actually changes computed background colour", async ({
 }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (e) => pageErrors.push(String(e)));
+  // Deterministic starting theme: seed light before navigation. The
+  // previous count()-based branch was racy (it read the button label in
+  // the window between first paint and the theme effect), which flaked
+  // this test. Assertions are unchanged: light -> dark must change the
+  // computed background and persist across reload.
+  await page.addInitScript(() => {
+    // Seed light only when nothing is stored yet: addInitScript runs on
+    // EVERY navigation (including page.reload()), so an unconditional
+    // set would overwrite the dark choice the test just persisted.
+    if (localStorage.getItem("netpulse-theme") === null) {
+      localStorage.setItem("netpulse-theme", "light");
+    }
+  });
   await page.goto("/");
   const bodyBg = () =>
     page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  await expect(page.locator("html")).toHaveClass(/light/);
   const light = await bodyBg();
-  await page.getByRole("button", { name: /Switch to dark mode/ }).click();
+  await page.getByRole("button", { name: "Switch to dark mode" }).click();
   await expect(page.locator("html")).toHaveClass(/dark/);
   const dark = await bodyBg();
   expect(dark).not.toBe(light);

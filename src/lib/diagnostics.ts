@@ -6,17 +6,24 @@ export interface ResolverResult {
   resolver: string;
   server: string;
   host: string;
+  /** First resolved IPv4 address, or null when resolution failed. */
+  address: string | null;
   timeMs: number | null;
   error: string | null;
 }
 
 export interface HostTiming {
   host: string;
+  /** Address actually connected to (system resolver result). */
+  resolvedIp: string | null;
   dnsMs: number | null;
   tcpMs: number | null;
   tlsMs: number | null;
   httpMs: number | null;
   status: number | null;
+  contentType: string | null;
+  contentLength: string | null;
+  redirectLocation: string | null;
   error: string | null;
 }
 
@@ -24,6 +31,7 @@ const RESOLVERS = [
   { name: "Cloudflare DNS", server: "1.1.1.1" },
   { name: "Google DNS", server: "8.8.8.8" },
   { name: "Quad9 DNS", server: "9.9.9.9" },
+  { name: "OpenDNS", server: "208.67.222.222" },
 ];
 
 /**
@@ -55,12 +63,13 @@ export async function resolveWithResolvers(host: string): Promise<ResolverResult
     const resolver = new dns.Resolver();
     resolver.setServers([r.server]);
     const out = await timed(() =>
-      withTimeout(resolver.resolve4(host).then((a) => a.length), 4000, `${r.name} DNS`),
+      withTimeout(resolver.resolve4(host), 4000, `${r.name} DNS`),
     );
     results.push({
       resolver: r.name,
       server: r.server,
       host,
+      address: "error" in out ? null : (out.value[0] ?? null),
       timeMs: out.ms === null ? null : Math.round(out.ms * 100) / 100,
       error: "error" in out ? out.error : null,
     });
@@ -70,6 +79,7 @@ export async function resolveWithResolvers(host: string): Promise<ResolverResult
     resolver: "System resolver",
     server: "system",
     host,
+    address: "error" in sys ? null : (sys.value[0]?.address ?? null),
     timeMs: sys.ms === null ? null : Math.round(sys.ms * 100) / 100,
     error: "error" in sys ? sys.error : null,
   });
@@ -79,7 +89,7 @@ export async function resolveWithResolvers(host: string): Promise<ResolverResult
 export async function measureHost(host: string, port = 443): Promise<HostTiming> {
   const dnsOut = await timed(() => withTimeout(dns.lookup(host), 4000, "DNS lookup"));
   if (dnsOut.ms === null) {
-    return { host, dnsMs: null, tcpMs: null, tlsMs: null, httpMs: null, status: null, error: "error" in dnsOut ? dnsOut.error : "dns failed" };
+    return { host, resolvedIp: null, dnsMs: null, tcpMs: null, tlsMs: null, httpMs: null, status: null, contentType: null, contentLength: null, redirectLocation: null, error: "error" in dnsOut ? dnsOut.error : "dns failed" };
   }
   const address = dnsOut.value.address;
   const tcpOut = await timed(
@@ -92,7 +102,7 @@ export async function measureHost(host: string, port = 443): Promise<HostTiming>
       }),
   );
   if (tcpOut.ms === null) {
-    return { host, dnsMs: Math.round(dnsOut.ms * 100) / 100, tcpMs: null, tlsMs: null, httpMs: null, status: null, error: "error" in tcpOut ? tcpOut.error : "tcp failed" };
+    return { host, resolvedIp: address, dnsMs: Math.round(dnsOut.ms * 100) / 100, tcpMs: null, tlsMs: null, httpMs: null, status: null, contentType: null, contentLength: null, redirectLocation: null, error: "error" in tcpOut ? tcpOut.error : "tcp failed" };
   }
   const tlsOut = await timed(
     () =>
@@ -106,23 +116,35 @@ export async function measureHost(host: string, port = 443): Promise<HostTiming>
   const httpStart = performance.now();
   let status: number | null = null;
   let httpError: string | null = null;
+  let contentType: string | null = null;
+  let contentLength: string | null = null;
+  let redirectLocation: string | null = null;
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
+    // redirect: manual — a redirect target is reported, never followed, so
+    // a redirect to a private address cannot turn this into a proxy.
     const res = await fetch(`https://${host}/`, { method: "HEAD", signal: controller.signal, redirect: "manual" });
     clearTimeout(timer);
     status = res.status;
+    contentType = res.headers.get("content-type");
+    contentLength = res.headers.get("content-length");
+    redirectLocation = res.headers.get("location");
     await res.arrayBuffer().catch(() => undefined);
   } catch (err) {
     httpError = err instanceof Error ? err.message : "http failed";
   }
   return {
     host,
+    resolvedIp: address,
     dnsMs: Math.round(dnsOut.ms * 100) / 100,
     tcpMs: Math.round(tcpOut.ms * 100) / 100,
     tlsMs: tlsOut.ms === null ? null : Math.round(tlsOut.ms * 100) / 100,
     httpMs: httpError ? null : Math.round((performance.now() - httpStart) * 100) / 100,
     status,
+    contentType,
+    contentLength,
+    redirectLocation,
     error: httpError ?? ("error" in tlsOut ? tlsOut.error : null),
   };
 }

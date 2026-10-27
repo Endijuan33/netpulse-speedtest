@@ -61,6 +61,17 @@ export function Gauge({
   }, [value]);
 
   const geo = gaugeGeometry(displayed, GAUGE_MAX_MBPS);
+  // Reference tick marks (log scale): label positions are computed from the
+  // same geometry as the needle, so ticks, needle and arc can never drift.
+  const ticks = [0, 1, 5, 10, 50, 100, 500, 1000].map((v) => {
+    const tip = gaugeGeometry(v, GAUGE_MAX_MBPS).tip;
+    const f = 92 / 78;
+    // Clamp inside the 200x150 viewBox so end labels (500/1000) are never
+    // clipped by the SVG edge — the previous radius pushed them outside.
+    const x = Math.min(186, Math.max(14, GAUGE_CX + (tip.x - GAUGE_CX) * f));
+    const y = Math.min(140, Math.max(10, GAUGE_CY + (tip.y - GAUGE_CY) * f));
+    return { v, x, y };
+  });
   return (
     <div
       className="flex flex-col items-center"
@@ -69,12 +80,19 @@ export function Gauge({
     >
       <svg
         viewBox="0 0 200 150"
-        className="w-full max-w-[320px]"
+        className="w-full max-w-[340px]"
         aria-hidden="true"
         data-testid="gauge"
         data-norm={geo.norm.toFixed(3)}
         data-angle={geo.angle.toFixed(1)}
       >
+        <defs>
+          <linearGradient id="gaugeGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#00a8ff" />
+            <stop offset="55%" stopColor="#2563ff" />
+            <stop offset="100%" stopColor="#a855f7" />
+          </linearGradient>
+        </defs>
         <path
           d="M 32.5 144 A 78 78 0 1 1 167.5 144"
           fill="none"
@@ -84,16 +102,23 @@ export function Gauge({
           strokeLinecap="round"
           pathLength={100}
         />
-        <path
-          d="M 32.5 144 A 78 78 0 1 1 167.5 144"
-          fill="none"
-          stroke="#2563eb"
-          strokeWidth="14"
-          strokeLinecap="round"
-          pathLength={100}
-          strokeDasharray="100"
-          strokeDashoffset={geo.dashOffset}
-        />
+        {geo.norm > 0 && (
+          <path
+            d="M 32.5 144 A 78 78 0 1 1 167.5 144"
+            fill="none"
+            stroke="url(#gaugeGrad)"
+            strokeWidth="14"
+            strokeLinecap="round"
+            pathLength={100}
+            strokeDasharray="100"
+            strokeDashoffset={geo.dashOffset}
+          />
+        )}
+        {ticks.map((t) => (
+          <text key={t.v} x={t.x} y={t.y} textAnchor="middle" dominantBaseline="middle" fontSize="9" fill="#94a3b8">
+            {t.v}
+          </text>
+        ))}
         <line
           data-testid="gauge-needle"
           data-angle={geo.angle.toFixed(1)}
@@ -101,11 +126,11 @@ export function Gauge({
           y1={GAUGE_CY}
           x2={geo.tip.x}
           y2={geo.tip.y}
-          stroke="currentColor"
+          stroke="#f8fafc"
           strokeWidth="3"
           strokeLinecap="round"
         />
-        <circle cx={GAUGE_CX} cy={GAUGE_CY} r="6" fill="currentColor" />
+        <circle cx={GAUGE_CX} cy={GAUGE_CY} r="6" fill="#f8fafc" />
       </svg>
       <p className="text-4xl font-bold tabular-nums">
         {formatSpeed(displayed, unit)}

@@ -1,5 +1,25 @@
-import type { SpeedResult } from "./validation";
+import { speedResultSchema, type SpeedResult } from "./validation";
 import type { SpeedUnit } from "./units";
+
+/**
+ * Validate + dedupe stored records (IndexedDB integrity): records that fail
+ * schema validation are dropped (never rendered as invented data), and
+ * duplicate ids keep only the first record with that id. The store schema itself is
+ * unchanged (v1, keyPath id), so existing records migrate in place — no
+ * silent erase, no schema bump required.
+ */
+export function validateResults(raw: unknown[]): SpeedResult[] {
+  const seen = new Set<string>();
+  const valid: SpeedResult[] = [];
+  for (const item of raw) {
+    const parsed = speedResultSchema.safeParse(item);
+    if (!parsed.success) continue;
+    if (seen.has(parsed.data.id)) continue;
+    seen.add(parsed.data.id);
+    valid.push(parsed.data);
+  }
+  return valid.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+}
 
 /** Minimal IndexedDB wrapper (no extra dependency) for test history. */
 const DB_NAME = "netpulse";
@@ -33,12 +53,7 @@ export async function listResults(): Promise<SpeedResult[]> {
   const db = await openDb();
   const items = await new Promise<SpeedResult[]>((resolve, reject) => {
     const req = db.transaction(STORE, "readonly").objectStore(STORE).getAll();
-    req.onsuccess = () =>
-      resolve(
-        (req.result as SpeedResult[]).sort((a, b) =>
-          b.timestamp.localeCompare(a.timestamp),
-        ),
-      );
+    req.onsuccess = () => resolve(validateResults(req.result as unknown[]));
     req.onerror = () => reject(req.error);
   });
   db.close();
@@ -50,6 +65,17 @@ export async function deleteResult(id: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
     tx.objectStore(STORE).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}
+
+export async function clearAll(): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).clear();
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });

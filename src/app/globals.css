@@ -26,6 +26,85 @@ body {
     sans-serif;
 }
 
+/* ---- NetPulse premium design tokens (reference palette) ---- */
+:root {
+  --np-bg: #f1f5f9;
+  --np-bg-2: #ffffff;
+  --np-card: #ffffff;
+  --np-elevated: #f8fafc;
+  --np-border: #e2e8f0;
+  --np-text: #0f172a;
+  --np-muted: #64748b;
+  --np-primary: #2563ff;
+  --np-electric: #00a8ff;
+  --np-accent: #a855f7;
+  --np-success: #10b981;
+  --np-warning: #f59e0b;
+  --np-danger: #ef4444;
+}
+.dark {
+  --np-bg: #050918;
+  --np-bg-2: #0b1224;
+  --np-card: #101a30;
+  --np-elevated: #17243a;
+  --np-border: #1e2c4a;
+  --np-text: #f8fafc;
+  --np-muted: #94a3b8;
+}
+body {
+  background: var(--np-bg);
+  color: var(--np-text);
+}
+/* Shared premium surfaces (used by all four pages). */
+.np-card {
+  background: var(--np-card);
+  border: 1px solid var(--np-border);
+  border-radius: 1rem;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.15);
+}
+.np-card-hover:hover {
+  border-color: #2563ff66;
+}
+.np-elevated {
+  background: var(--np-elevated);
+  border: 1px solid var(--np-border);
+  border-radius: 0.75rem;
+}
+.np-btn-primary {
+  background: linear-gradient(135deg, #2563ff, #00a8ff);
+  color: #fff;
+  border-radius: 9999px;
+  font-weight: 600;
+}
+.np-btn-primary:hover {
+  filter: brightness(1.1);
+}
+.np-btn-primary:disabled {
+  opacity: 0.5;
+}
+.np-input {
+  background: var(--np-elevated);
+  border: 1px solid var(--np-border);
+  border-radius: 0.5rem;
+  color: var(--np-text);
+  padding: 0.5rem 0.75rem;
+}
+.np-input:focus {
+  outline: 2px solid #2563ff;
+  outline-offset: 1px;
+}
+.np-muted {
+  color: var(--np-muted);
+}
+.np-tab-active {
+  background: #2563ff;
+  color: #fff;
+}
+:focus-visible {
+  outline: 2px solid #00a8ff;
+  outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

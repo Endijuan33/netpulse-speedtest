@@ -12,11 +12,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+      <body className="min-h-screen">
         <ThemeProvider>
           <Nav />
-          <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
-          <footer className="mx-auto max-w-6xl px-4 pb-8 text-center text-xs text-gray-500">
+          <main className="mx-auto max-w-[1440px] px-4 py-6">{children}</main>
+          <footer className="mx-auto max-w-[1440px] px-4 pb-8 text-center text-xs np-muted">
             NetPulse measures real network traffic. Ping is HTTP round-trip latency, not ICMP. Packet loss shown is HTTP request loss, not ICMP packet loss.
           </footer>
         </ThemeProvider>
