@@ -279,13 +279,6 @@ export default function Dashboard() {
           >
             Current: {formatSpeed(current, unit)} · Elapsed: {elapsed}s
           </p>
-          <p className="mt-1 text-center text-xs text-gray-400">
-            Gauge scale is logarithmic (Ookla-style) over 0–1000 Mbps; the
-            number above is the true linear speed. Test server: this
-            deployment&apos;s region (US East, iad1) — Ookla/Google use a nearby
-            local server, so some gap vs those tests is geography and round-trip
-            time, not just this engine.
-          </p>
         </div>
 
         {running && (

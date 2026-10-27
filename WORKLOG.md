@@ -92,3 +92,10 @@ All gates run in ~/workspace/netpulse, Node v24.22.1, pnpm 10.18.3.
 - Dark mode: Tailwind v4 @custom-variant fix; Playwright asserts computed background change.
 - Unit toggle Mbps/MB/s (persisted) across dashboard, chart, results, history, share, print, CSV/TXT. Production toast removed (silent history save).
 - Gates: typecheck 0, lint 0/0, Vitest 29/29, build 0 warnings, Playwright 13/13, console page errors 0 in asserting specs.
+
+## 2026-10-27 — remove gauge/server-region note from dashboard
+- Removed the user-facing explanatory paragraph under the gauge from
+  src/app/page.tsx at the user's request. No third-party comparison
+  remains in user-facing dashboard text. No functional change; gates
+  re-run for this change: typecheck 0, source lint 0/0, Vitest 29/29,
+  production build success 0 warnings.
