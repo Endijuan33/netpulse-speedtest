@@ -3,19 +3,29 @@ import { test, expect } from "@playwright/test";
 test("dashboard loads and shows start button", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("button", { name: "START TEST" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Network Speedtest" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Network Speedtest" }),
+  ).toBeVisible();
 });
 
 test("short test runs and can be cancelled", async ({ page }) => {
   await page.goto("/?testMode=short");
+  // Dev-server hydration race (round 3 CI): a click before hydration is
+  // lost, so wait for the page to settle before clicking START.
+  await page.waitForLoadState("networkidle");
   await page.getByRole("button", { name: "START TEST" }).click();
-  await expect(page.getByRole("button", { name: "Cancel Test" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cancel Test" })).toBeVisible({
+    timeout: 30_000,
+  });
   await page.getByRole("button", { name: "Cancel Test" }).click();
   await expect(page.getByRole("button", { name: "START TEST" })).toBeVisible();
 });
 
 test("theme toggle switches dark class", async ({ page }) => {
   await page.goto("/");
+  // Same hydration race: the mount effect that applies the stored theme
+  // can overwrite a toggle clicked too early, so settle first.
+  await page.waitForLoadState("networkidle");
   const btn = page.getByRole("button", { name: /Switch to (dark|light) mode/ });
   await btn.click();
   await expect(page.locator("html")).toHaveClass(/dark|light/);
