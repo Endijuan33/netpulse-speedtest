@@ -55,6 +55,13 @@ body {
   background: var(--np-bg);
   color: var(--np-text);
 }
+/* Belt-and-braces against mobile horizontal scroll: `clip` (unlike
+ * `hidden`) also blocks programmatic/scroll-chaining panning on mobile
+ * browsers, so a decorative oversized layer can never shift the page. */
+html,
+body {
+  overflow-x: clip;
+}
 /* Shared premium surfaces (used by all four pages). */
 .np-card {
   background: var(--np-card);
@@ -99,54 +106,28 @@ body {
     radial-gradient(ellipse 40% 26% at 88% 0%, rgb(168 85 247 / 0.18), transparent 70%),
     radial-gradient(ellipse 36% 24% at 8% 0%, rgb(0 168 255 / 0.16), transparent 70%);
 }
-/* Dashboard Earth glow: a CSS-only planet limb behind the gauge — a deep
- * blue disc with a bright atmospheric rim and a faint star field. This is
- * decoration, not the user's reference screenshot (never used as an image),
- * and it is fully static so it cannot disturb measurements. */
-.np-earth {
-  position: absolute;
-  left: 50%;
-  top: -4.5rem;
-  width: 34rem;
-  height: 34rem;
-  max-width: 130%;
-  aspect-ratio: 1;
-  transform: translateX(-50%);
-  border-radius: 9999px;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 38% 30%, #1d4ed8 0%, #0b1e4b 42%, #050918 72%);
-  box-shadow:
-    0 0 0 1px rgb(0 168 255 / 0.25),
-    0 0 90px 18px rgb(37 99 255 / 0.35),
-    0 0 160px 40px rgb(0 168 255 / 0.18);
-  opacity: 0.85;
-}
-.np-earth::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 9999px;
-  background:
-    radial-gradient(circle at 62% 18%, rgb(147 197 253 / 0.35), transparent 42%),
-    radial-gradient(circle at 30% 72%, rgb(0 168 255 / 0.18), transparent 45%);
-}
-.np-stars {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.35;
+/* Speedometer card background: the user's own Earth photo (public/
+ * images/netpulse-earth-bg, WebP primary with PNG fallback), covered by
+ * a translucent navy gradient so gauge numbers stay readable. This
+ * REPLACES the old CSS-only Earth disc — the two are never stacked.
+ * The card's overflow-hidden clips the photo strictly inside the card,
+ * so it can never cause horizontal overflow on phones. */
+.np-gauge-bg {
+  /* Fallback for browsers without image-set type() support. */
+  background-image: url("/images/netpulse-earth-bg.png");
   background-image:
-    radial-gradient(rgb(255 255 255 / 0.8) 1px, transparent 1.4px),
-    radial-gradient(rgb(147 197 253 / 0.7) 1px, transparent 1.4px);
-  background-size: 74px 74px, 118px 118px;
-  background-position: 0 0, 37px 53px;
-}
-@media (prefers-reduced-motion: reduce) {
-  .np-earth,
-  .np-stars {
-    opacity: 0.5;
-  }
+    linear-gradient(
+      rgb(5 9 24 / 0.55),
+      rgb(5 9 24 / 0.2) 45%,
+      rgb(5 9 24 / 0.45)
+    ),
+    image-set(
+      url("/images/netpulse-earth-bg.webp") type("image/webp"),
+      url("/images/netpulse-earth-bg.png") type("image/png")
+    );
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 .np-elevated {
   background: var(--np-elevated);

@@ -43,7 +43,7 @@ export function Sparkline({ values, color = "#00a8ff", label }: { values: number
 
 export function MetricCard({ icon, name, value, unit, accent, samples, sampleLabel }: { icon: ReactNode; name: string; value: string; unit?: string; accent: string; samples?: number[]; sampleLabel?: string }) {
   return (
-    <section className="np-card np-card-hover p-4" aria-label={name}>
+    <section className="np-card np-card-hover min-w-0 p-4" aria-label={name}>
       <div className="flex items-center gap-2 text-sm np-muted">
         <span className="np-icon-chip" style={{ color: accent, background: `${accent}22` }}>{icon}</span>
         <span>{name}</span>

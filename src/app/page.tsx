@@ -338,21 +338,21 @@ export default function Dashboard() {
           <p className="mt-3 text-xs np-muted">This deployment has a single origin test server; there is no fleet to choose from. Reference endpoints below are latency-only, not speedtest servers.</p>
         </section>
 
-        <section className="np-card relative overflow-hidden p-6 xl:col-span-6" aria-label="Speedtest">
-          <div className="np-stars" aria-hidden="true" />
-          <div className="np-earth" aria-hidden="true" />
+        <section className="np-card np-gauge-bg relative overflow-hidden p-6 xl:col-span-6" aria-label="Speedtest">
           <div className="relative">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h1 className="text-2xl font-bold">Network Speedtest</h1>
-                <p className="text-sm np-muted" role="status" aria-live="polite">
-                  {infoError ? "Network info unavailable — test still works." : info ? `${info.ip ?? "IP unknown"} · ${info.isp ?? "ISP unknown"}` : "Detecting network…"}
-                </p>
-              </div>
-              <SpeedUnitToggle unit={unit} onChange={changeUnit} />
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold">Network Speedtest</h1>
+              <p className="truncate text-sm np-muted" role="status" aria-live="polite">
+                {infoError ? "Network info unavailable — test still works." : info ? `${info.ip ?? "IP unknown"} · ${info.isp ?? "ISP unknown"}` : "Detecting network…"}
+              </p>
             </div>
-            <div className="mt-4">
+            <div className="mt-4 min-w-0">
               <Gauge value={gaugeValue} unit={unit} label={running && phase === "Measuring upload" ? "Upload" : "Download"} />
+              {/* Unit toggle directly below the gauge (reference layout),
+                full width centred — never clipped at the card edge. */}
+              <div className="mt-3 flex justify-center">
+                <SpeedUnitToggle unit={unit} onChange={changeUnit} />
+              </div>
               <p className="mt-2 text-center text-sm np-muted" aria-live="polite">
                 Current: {formatSpeed(current, unit)} · Elapsed: {elapsed}s
               </p>
@@ -441,7 +441,7 @@ export default function Dashboard() {
             <h2 className="flex items-center gap-2 font-semibold"><span className="np-icon-chip" style={{ color: "#00a8ff", background: "#00a8ff22" }}><TrendingUp aria-hidden="true" /></span>Realtime Throughput</h2>
             <p className="text-xs np-muted"><span className="text-[#00a8ff]">● Download</span> <span className="text-[#a855f7]">● Upload</span></p>
           </div>
-          <div className="mt-4 h-64" aria-label="Live throughput chart">
+          <div className="mt-4 h-64 min-w-0" aria-label="Live throughput chart">
             {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData}>

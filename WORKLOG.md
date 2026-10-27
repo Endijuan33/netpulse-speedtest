@@ -251,3 +251,85 @@ All gates run in ~/workspace/netpulse, Node v24.22.1, pnpm 10.18.3.
   treatment as other Dashboard headers. No log behaviour, chart data, or
   measurement code changed.
 - Files: src/app/network/page.tsx, src/app/page.tsx, next.config.ts.
+
+## 2026-10-28 — dashboard mobile gauge fix (user phone screenshot, 390 px)
+
+- SYMPTOMS (live, Chrome Android, 01:41 WIB): page horizontally shifted
+  (title cut to "k Speedtest", Mbps pill cut at right edge, metric cards
+  cut), Earth disc dominating the gauge, idle gauge a flat grey arc with
+  a thin white needle, centre icon / Download pill / unit toggle missing
+  or cut off.
+- DIAGNOSIS (local prod build, 390 px probe): document scrollWidth was
+  already 390 (no document overflow in headless Chromium), but .np-earth
+  was 463 px wide (34rem, max-width 130%) with its right edge at x=426 —
+  clipped by the card's overflow-hidden in headless Chrome, yet able to
+  shift/pan the page on Chrome Android. The grey idle arc was the
+  deliberate norm=0 gradient suppression from an earlier round; the
+  centre content never existed (number sat below the SVG); the toggle
+  lived in the header row where it could clip.
+- FIX (Dashboard/gauge only; engine, map, other pages untouched):
+  (a) .np-earth now width min(34rem, 100%) — strictly inside the card;
+  (b) html/body overflow-x: clip as belt-and-braces (clip, unlike
+  hidden, also blocks mobile scroll-chaining panning);
+  (c) Gauge centre content moved INSIDE the arc: gradient icon circle
+  (download/upload arrow), big value, unit, phase pill, centred on the
+  arc centre (top 70% of the viewBox), needle base covered by the icon
+  circle as in the reference; SVG is width 100% / height auto inside a
+  max-w-[340px] centred wrapper;
+  (d) track is now ALWAYS the blue→purple gradient at 0.28 opacity
+  (never flat grey); the full-strength progress arc draws only when
+  norm > 0; idle needle still points exactly at tick 0 (angle -120.0);
+  (e) tick font 9 -> 8 with the existing viewBox clamps;
+  (f) SpeedUnitToggle moved from the header row to centred below the
+  gauge; header subtitle truncated to avoid long IP/ISP wrapping
+  blowout; metric cards and chart container got min-w-0.
+- VERIFICATION (390 px AFTER screenshot, /tmp/np-dash-390-after.png):
+  title, gauge, toggle, all 4 metric cards, and the Earth layer are all
+  inside the viewport at 360 AND 390 px; scrollWidth == clientWidth at
+  both; all 8 ticks 0–1000 inside the SVG; needle -120.0 at idle;
+  toggle fully visible below the gauge; centre icon/value/unit/pill
+  visible inside the arc; track reads blue→purple, not grey.
+- REMAINING DIFFERENCES vs the reference (honest): the reference shot
+  shows a COMPLETED test (bright progress arc at 286.9) while idle here
+  is correctly the dim track; the reference Earth is a photographic
+  planet, ours is deliberately a CSS disc/glow (never a screenshot
+  background) and is now contained; on a 390 px phone the gauge is
+  necessarily narrower than the desktop reference, proportions hold.
+- Files: src/components/Gauge.tsx, src/app/page.tsx,
+  src/app/globals.css, src/components/ui.tsx (min-w-0 on MetricCard).
+
+## 2026-10-28 — Earth photo speedometer background (user-supplied asset)
+
+- ASSET (verified, not taken on trust): source
+  ~/workspace/user/files/1000325255_15_ezgu.png is actually JPEG bytes
+  (JFIF), measured 1536x1024 RGB — the claimed dimensions check out, the
+  ".png" extension does not. Content confirmed by viewing: night Earth,
+  electric-blue atmosphere, Southeast Asia + city lights centred,
+  Australia lower right, no text/UI.
+- FILES: public/images/netpulse-earth-bg.png (PNG transcode, 1,755,485
+  bytes, 1536x1024) + public/images/netpulse-earth-bg.webp (WebP q80,
+  131,608 bytes — 46% smaller than the source JPEG, 92.5% smaller than
+  the PNG). AVIF NOT produced: sandbox PIL 10.2.0 has no AVIF support
+  (no libheif) — WebP only, as allowed. Browsers download the WebP in
+  practice; the PNG is fallback-only via image-set type() with a plain
+  url() fallback line for browsers without image-set support.
+- APPLICATION: .np-gauge-bg on the speedometer card — background-size
+  cover, position center, no-repeat, plus a navy gradient overlay
+  (initially 0.25/0.05/0.3, retuned to 0.55/0.20/0.45 after the first
+  screenshots showed the subtitle washed out over the bright atmosphere
+  rim). Tick labels got a dark halo (stroke #050918, 0.55 opacity,
+  paint-order stroke) for readability over bright clouds. The old
+  CSS-only Earth disc AND starfield were REMOVED (usage + CSS) — the
+  photo is the only Earth now, never stacked with the disc. Card
+  overflow-hidden still clips the photo strictly inside the card.
+- FIRST LOAD: unchanged — / stays 236 kB before and after (public/
+  images are not in the JS bundle). Honest page-weight note: first view
+  additionally downloads the 132 KB WebP (fallback browsers: 1.7 MB PNG).
+- VERIFICATION: desktop 1440 + mobile 360/390/430 screenshots
+  (/tmp/np-dash-1440-earth.png, /tmp/np-dash-390-earth.png): Earth +
+  SE Asia lights clearly visible behind the gauge on both, all numbers /
+  ticks / needle / toggle readable, scrollWidth == clientWidth and card
+  inside viewport at 360/390/430 px.
+- Files: public/images/netpulse-earth-bg.png,
+  public/images/netpulse-earth-bg.webp, src/app/page.tsx,
+  src/app/globals.css, src/components/Gauge.tsx (tick halo).

@@ -1,18 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { GAUGE_CX, GAUGE_CY, GAUGE_MAX_MBPS, gaugeGeometry } from "@/lib/gauge";
-import { formatSpeed, type SpeedUnit } from "@/lib/units";
+import { convertSpeed, formatSpeed, type SpeedUnit } from "@/lib/units";
 
 /**
- * SVG arc gauge. Needle angle and blue arc fill are derived from ONE
- * smoothed value (see src/lib/gauge.ts): the needle tip and the arc
- * dashoffset share the same normalized position on every frame, so they
- * can never disagree. Smoothing is a single exponential (rAF, tau ~140 ms)
- * applied to the displayed value — not a Motion spring on the arc alone,
- * which previously made the arc lag the needle. Reduced motion: jump
- * directly to the target. The displayed number is the true linear speed;
- * only the needle/arc position uses the log scale.
+ * SVG arc gauge, reference-style: the value, unit, phase pill, and a
+ * download/upload icon circle sit INSIDE the arc (centred on the arc
+ * centre), the unit toggle lives below the gauge on the dashboard, and
+ * the track is always a dim blue→purple gradient — never a flat grey
+ * arc. Needle angle and progress-arc fill derive from ONE smoothed value
+ * (see src/lib/gauge.ts): the needle tip and the arc dashoffset share
+ * the same normalized position on every frame, so they can never
+ * disagree. Smoothing is a single exponential (rAF, tau ~140 ms).
+ * Reduced motion: jump directly to the target. The displayed number is
+ * the true linear speed; only the needle/arc position uses the log scale.
+ * At idle (norm 0) the needle points exactly at tick 0 and only the dim
+ * track shows — the progress arc is drawn only when norm > 0.
  */
 export function Gauge({
   value,
@@ -72,70 +77,90 @@ export function Gauge({
     const y = Math.min(140, Math.max(10, GAUGE_CY + (tip.y - GAUGE_CY) * f));
     return { v, x, y };
   });
+  const num = convertSpeed(displayed, unit).toFixed(1);
+  const unitLabel = unit === "MBps" ? "MB/s" : "Mbps";
   return (
     <div
-      className="flex flex-col items-center"
+      className="mx-auto w-full max-w-[340px]"
       role="img"
       aria-label={`${label}: ${formatSpeed(displayed, unit)}`}
     >
-      <svg
-        viewBox="0 0 200 150"
-        className="w-full max-w-[340px]"
-        aria-hidden="true"
-        data-testid="gauge"
-        data-norm={geo.norm.toFixed(3)}
-        data-angle={geo.angle.toFixed(1)}
-      >
-        <defs>
-          <linearGradient id="gaugeGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#00a8ff" />
-            <stop offset="55%" stopColor="#2563ff" />
-            <stop offset="100%" stopColor="#a855f7" />
-          </linearGradient>
-        </defs>
-        <path
-          d="M 32.5 144 A 78 78 0 1 1 167.5 144"
-          fill="none"
-          stroke="currentColor"
-          strokeOpacity="0.15"
-          strokeWidth="14"
-          strokeLinecap="round"
-          pathLength={100}
-        />
-        {geo.norm > 0 && (
+      <div className="relative">
+        <svg
+          viewBox="0 0 200 150"
+          className="block h-auto w-full"
+          aria-hidden="true"
+          data-testid="gauge"
+          data-norm={geo.norm.toFixed(3)}
+          data-angle={geo.angle.toFixed(1)}
+        >
+          <defs>
+            <linearGradient id="gaugeGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#00a8ff" />
+              <stop offset="55%" stopColor="#2563ff" />
+              <stop offset="100%" stopColor="#a855f7" />
+            </linearGradient>
+          </defs>
+          {/* Dim gradient track: always visible, including at idle. */}
           <path
             d="M 32.5 144 A 78 78 0 1 1 167.5 144"
             fill="none"
             stroke="url(#gaugeGrad)"
+            strokeOpacity="0.28"
             strokeWidth="14"
             strokeLinecap="round"
             pathLength={100}
-            strokeDasharray="100"
-            strokeDashoffset={geo.dashOffset}
           />
-        )}
-        {ticks.map((t) => (
-          <text key={t.v} x={t.x} y={t.y} textAnchor="middle" dominantBaseline="middle" fontSize="9" fill="#94a3b8">
-            {t.v}
-          </text>
-        ))}
-        <line
-          data-testid="gauge-needle"
-          data-angle={geo.angle.toFixed(1)}
-          x1={GAUGE_CX}
-          y1={GAUGE_CY}
-          x2={geo.tip.x}
-          y2={geo.tip.y}
-          stroke="#f8fafc"
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-        <circle cx={GAUGE_CX} cy={GAUGE_CY} r="6" fill="#f8fafc" />
-      </svg>
-      <p className="text-4xl font-bold tabular-nums">
-        {formatSpeed(displayed, unit)}
-      </p>
-      <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
+          {/* Full-strength progress arc, only once there is a value. */}
+          {geo.norm > 0 && (
+            <path
+              d="M 32.5 144 A 78 78 0 1 1 167.5 144"
+              fill="none"
+              stroke="url(#gaugeGrad)"
+              strokeWidth="14"
+              strokeLinecap="round"
+              pathLength={100}
+              strokeDasharray="100"
+              strokeDashoffset={geo.dashOffset}
+            />
+          )}
+          {ticks.map((t) => (
+            <text key={t.v} x={t.x} y={t.y} textAnchor="middle" dominantBaseline="middle" fontSize="8" fill="#94a3b8" stroke="#050918" strokeOpacity="0.55" strokeWidth="2" paintOrder="stroke">
+              {t.v}
+            </text>
+          ))}
+          <line
+            data-testid="gauge-needle"
+            data-angle={geo.angle.toFixed(1)}
+            x1={GAUGE_CX}
+            y1={GAUGE_CY}
+            x2={geo.tip.x}
+            y2={geo.tip.y}
+            stroke="#f8fafc"
+            strokeWidth="3"
+            strokeLinecap="round"
+          />
+        </svg>
+        {/* Centre content: icon circle, value, unit, phase pill. The icon
+          circle covers the needle base, as in the reference. */}
+        <div
+          className="pointer-events-none absolute flex flex-col items-center"
+          style={{ left: "50%", top: "70%", transform: "translate(-50%, -50%)" }}
+        >
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-[#00a8ff] to-[#a855f7] shadow-lg shadow-[#2563ff]/40">
+            {label === "Upload" ? (
+              <ArrowUp className="h-6 w-6 text-white" aria-hidden="true" />
+            ) : (
+              <ArrowDown className="h-6 w-6 text-white" aria-hidden="true" />
+            )}
+          </span>
+          <p className="mt-1 text-4xl font-bold leading-none tabular-nums">{num}</p>
+          <p className="text-sm np-muted">{unitLabel}</p>
+          <span className="mt-1.5 rounded-full bg-[#2563ff]/25 px-3 py-0.5 text-xs font-semibold text-[#9cc3ff]">
+            {label}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
