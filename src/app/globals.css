@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+:root { color-scheme: light; }
+.dark { color-scheme: dark; }
+
+body { font-family: ui-sans-system, system-ui, -apple-system, "Segoe UI", sans-serif; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+@media print {
+  nav, .no-print { display: none !important; }
+  body { background: #fff !important; color: #000 !important; }
+}
