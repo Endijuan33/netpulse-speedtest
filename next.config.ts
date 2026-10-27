@@ -26,7 +26,7 @@ const nextConfig: NextConfig = {
               "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https://tile.openstreetmap.org",
-              "connect-src 'self' https://ip-api.com https://ipapi.co https://ipv4.icanhazip.com https://ipv6.icanhazip.com",
+              "connect-src 'self' https://ip-api.com https://ipapi.co https://ipv4.icanhazip.com https://ipv6.icanhazip.com https://cloudflare.com https://www.cloudflare.com https://google.com https://www.google.com",
               "font-src 'self'",
               "object-src 'none'",
               "base-uri 'self'",

@@ -148,11 +148,21 @@ export default function Dashboard() {
     if (!phase) lastPhaseRef.current = null;
   }, [phase, pushLog]);
 
+  // Lightweight, redirect-free probe paths: the bare homepages redirect
+  // (google.com -> www.google.com) and are heavy; these endpoints answer
+  // directly and are designed for connectivity checks. Timing is still
+  // browser-measured and labelled approximate.
+  const referenceProbeUrl = (hostname: string) =>
+    hostname === "cloudflare.com"
+      ? "https://www.cloudflare.com/cdn-cgi/trace"
+      : hostname === "google.com"
+        ? "https://www.google.com/generate_204"
+        : `https://${hostname}/`;
   const measureReference = async (hostname: string) => {
     setServerLat((p) => ({ ...p, [hostname]: "measuring…" }));
     try {
       const start = performance.now();
-      await fetch(`https://${hostname}/`, {
+      await fetch(referenceProbeUrl(hostname), {
         mode: "no-cors",
         cache: "no-store",
         signal: AbortSignal.timeout(8000),

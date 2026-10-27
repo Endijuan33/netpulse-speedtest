@@ -333,3 +333,12 @@ All gates run in ~/workspace/netpulse, Node v24.22.1, pnpm 10.18.3.
 - Files: public/images/netpulse-earth-bg.png,
   public/images/netpulse-earth-bg.webp, src/app/page.tsx,
   src/app/globals.css, src/components/Gauge.tsx (tick halo).
+
+## 2026-10-28 — Latency references unreachable fix
+- Root cause: CSP connect-src did not allow cloudflare.com/google.com, so
+  the browser blocked the reference-latency fetches (UI: "unreachable from
+  this browser"). Fix: next.config.ts connect-src += cloudflare.com,
+  www.cloudflare.com, google.com, www.google.com; page.tsx probes
+  lightweight redirect-free paths (cloudflare.com -> /cdn-cgi/trace,
+  google.com -> /generate_204). Timing stays browser-measured, approximate.
+- Files: next.config.ts, src/app/page.tsx.
