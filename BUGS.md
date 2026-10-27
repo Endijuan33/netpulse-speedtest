@@ -147,3 +147,120 @@ and a manual GitHub Advisory Database review of every direct dependency.
   theme persistence, 320 px). Playwright smoke: 5/5.
 - Playwright console page errors in the upload test: 0.
 - SSRF bypass attempts: 9/9 rejected with 403 (listed in #8).
+
+## Round 3 — 2026-10-27 (user phone testing: Ookla/Google >200 Mbps, NetPulse ~20 Mbps)
+
+Scope: user-reported 7 issues. NOTE ON EVIDENCE: the 3 videos the user
+sent are reference tests only (Ookla speedtest.net and Google speed test,
+Smartfren, Jakarta server, ~215/228 Mbps download) — NOT NetPulse
+recordings. Gauge issues below therefore could not be visually confirmed
+from NetPulse footage; they were fixed from the user's description plus
+code inspection, and the fixes are covered by unit + Playwright tests.
+
+### R3-1. CRITICAL — Gauge needle not smooth, needle/arc mismatch
+- Root causes (all verified in code): (a) needle swept 240° (-120°..+120°)
+  while the background arc was a 180° semicircle; (b) needle tips at the
+  extremes fell outside the 200x120 viewBox (y=139 > 120); (c) arc used
+  strokeDasharray 410 while the true arc length is ~327, so fill fraction
+  never matched the needle; (d) the arc was Motion-animated (0.4 s easeOut)
+  while the needle jumped instantly; (e) the old adaptive max
+  (ceil(value/100)*100) made the needle jump BACKWARDS as max grew mid-test.
+- Fix: src/lib/gauge.ts is now the single source of truth — centre
+  (100,105), radius 78, viewBox 0 0 200 150, a true 240° arc
+  (M 32.5 144 A 78 78 0 1 1 167.5 144), pathLength=100 so dashoffset is
+  exactly 100*(1-norm). Gauge.tsx smooths ONE displayed value with a
+  single rAF exponential (tau ~140 ms); needle and arc derive from it on
+  every frame. Scale is Ookla-style logarithmic over a FIXED 0–1000 Mbps
+  (norm = log10(1+v)/log10(1+1000)): 20 Mbps ~44% of sweep, 200 Mbps ~77%.
+  The displayed number stays the true linear speed; only position is log.
+- Tests: Vitest gauge-geometry (angle==dashoffset at 0/25/50/75/100%,
+  tips inside viewBox) + Playwright gauge-moves test.
+
+### R3-2. CRITICAL — Download capped near ~20 Mbps vs Ookla/Google 200+
+- Diagnosis (measured, not guessed): server-side random-byte generation
+  is NOT the bottleneck (~1.8 GB/s locally). From this sandbox, one Vercel
+  download stream runs at ~19 Mbps and 4 parallel streams aggregate to
+  ~51 Mbps — per-stream throughput is the scarce resource. The old engine
+  wasted it: sequential 1–32 MB chunks with 4 workers, a full round trip +
+  fresh serverless invocation per chunk, chunk size scaled from a cumulative
+  average that stayed low during warmup, and no warmup discard.
+- Fix: 8 concurrent workers (documented cap), each opening ONE 100 MB
+  stream (route maximum) and reading until the window ends, then cancelling
+  the reader (plus a watchdog that cancels stalled readers after the
+  window). First 1000 ms (500 ms short mode) is warmup and discarded from
+  the result. Only 8 requests per test, so the 60/min download rate limit
+  is never the constraint. Server route unchanged (per-chunk crypto bytes;
+  generation is fast, and repeating a fixed buffer would weaken the
+  anti-cache claim for no measured gain).
+- Proof on a fast path: local production server, headless browser, short
+  test: Download 1402.6 Mbps, Upload 29.8 Mbps (loopback; loaded latencies
+  are inflated on loopback because 8 saturated streams share the loopback
+  with the ping traffic — that is latency-under-load, not a measurement
+  error). UNPROVEN (honest): whether a real Indonesian mobile link now
+  reaches 200+ Mbps — sandbox measurements prove the engine no longer caps
+  near 20 Mbps, but only the user's phone retest on Smartfren can confirm
+  the Jakarta figure, because part of the gap is geography (see below).
+- Geography caveat, now shown in the UI: the test server is the Vercel
+  deployment region (iad1, US East) while Ookla/Google used a Jakarta-local
+  server, so some gap vs those tests is RTT, not engine.
+
+### R3-3. MAJOR — Dark/light mode did not visibly work
+- Root cause: Tailwind v4. In v4 the `dark:` variant defaults to the
+  prefers-color-scheme MEDIA query, so toggling the `.dark` class on <html>
+  did nothing — label changed and persisted, screenshots stayed light.
+- Fix: `@custom-variant dark (&:where(.dark, .dark *));` in globals.css.
+- Test: Playwright now asserts the COMPUTED body background colour
+  actually changes (not just the class/label). Note: Tailwind v4 reports
+  gray-950 as oklch, not rgb — an early assertion expecting rgb(3,7,18)
+  failed on the string form while the colour had in fact changed; the
+  assertion was corrected to change-detection, which is the real property.
+
+### R3-4. Needle did not reset after a test
+- Root cause: dashboard gauge showed `result.downloadMbps` after a test,
+  and `current` was never cleared, so the needle froze at the final value.
+- Fix: gauge shows the live value only while running and 0 otherwise;
+  `current` is cleared on completion and in the run finally() (cancel too).
+  Result cards are untouched.
+
+### R3-5. Production-visible internal toast removed
+- Removed "Result saved to history (IndexedDB, this browser only)." —
+  saving is now silent; results are still listed on /history. Grep for
+  other user-facing internal strings: the history/result pages' IndexedDB
+  sentences are deliberate user-facing privacy info, not debug text, and
+  were kept; the share toast is deliberate privacy info and was kept.
+
+### R3-6. Speed-unit option (Mbps / MB/s) before starting a test
+- Added SpeedUnitToggle (radio group) on the dashboard next to START TEST
+  and on History; persisted in localStorage (netpulse-speed-unit, default
+  Mbps). It converts gauge number, live current, chart axis + tooltip,
+  result cards, history list + comparison, share page, print page, and
+  CSV/TXT exports (CSV header switches to downloadMBps/uploadMBps when
+  MB/s is selected). Canonical stored values stay in Mbps.
+- Tests: Vitest conversion (80 Mbps = 10 MB/s) + persistence parsing;
+  Playwright toggle-converts-and-persists (incl. fixing two test-only
+  selector bugs: sr-only radio under the sticky nav, and getByLabel
+  ambiguity with the gauge aria-label).
+
+### R3-7. Audit attempt this round
+- pnpm binary in this session is a self-managing shim that fails with
+  EPERM before running anything, and the sandbox registry blocked pnpm
+  audit in both prior rounds (403 policy_denied, then ECONNRESET). No
+  audit verdict is claimed. No new dependencies were added this round
+  (gauge/units are hand-written), so the dependency surface is unchanged
+  from the round-2 manual advisory review (Next 15.5.28, Zod 4.6.7).
+
+### R3 verification
+- Typecheck 0 errors. Lint 0 errors, 0 warnings. Prettier clean on
+  changed files. Vitest 29/29 (was 24; +5 gauge/unit tests).
+- Production build success, 0 build warnings, / first load 203 kB.
+- Playwright regression 8/8 + smoke 5/5 = 13/13, console page errors 0
+  in the specs that assert them (gauge, theme, unit, upload tests).
+- Local short-test proof: Download 1402.6 Mbps, Upload 29.8 Mbps.
+
+### R3 residual / unproven (not bugs, documented)
+- 200+ Mbps on a real Indonesian mobile link: unproven until the user
+  retests on their phone (see R3-2). The engine ceiling is removed; the
+  remaining gap, if any, is geography/RTT to iad1 or the mobile link.
+- Loaded latency under 8 saturated streams is high by construction
+  (latency under load); loopback short test showed 1069 ms download
+  loaded latency while saturated.

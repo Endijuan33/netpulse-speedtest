@@ -85,3 +85,10 @@ All gates run in ~/workspace/netpulse, Node v24.22.1, pnpm 10.18.3.
 - Gates this round: typecheck 0 errors, lint 0 errors 0 warnings,
   Vitest 24/24, build success 0 warnings, Playwright regression 5/5,
   Playwright smoke 5/5, console page errors in upload test 0.
+
+## 2026-10-27 — round 3 (user phone testing, 7 issues)
+- Gauge: single source of truth in src/lib/gauge.ts (true 240° arc, pathLength=100, log 0–1000 scale, rAF smoothing); needle resets to 0 on completion/cancel.
+- Download engine: 8 long-stream workers, 100 MB streams, 1 s warmup discarded, reader watchdog. Local short-test proof: Download 1402.6 Mbps.
+- Dark mode: Tailwind v4 @custom-variant fix; Playwright asserts computed background change.
+- Unit toggle Mbps/MB/s (persisted) across dashboard, chart, results, history, share, print, CSV/TXT. Production toast removed (silent history save).
+- Gates: typecheck 0, lint 0/0, Vitest 29/29, build 0 warnings, Playwright 13/13, console page errors 0 in asserting specs.
