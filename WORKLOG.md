@@ -99,3 +99,15 @@ All gates run in ~/workspace/netpulse, Node v24.22.1, pnpm 10.18.3.
   remains in user-facing dashboard text. No functional change; gates
   re-run for this change: typecheck 0, source lint 0/0, Vitest 29/29,
   production build success 0 warnings.
+
+## 2026-10-27 — network-info organization fallback + reverse DNS
+- Organization: provider org -> name parsed from the ASN string -> APNIC
+  RDAP (5 s timeout). RDAP parsing never mislabels a contact person as
+  the organization: it prefers the top-level "description" remark, then a
+  registrant entity vCard fn, then the RDAP name, then entity remarks.
+- ISP hostname: ip-api `reverse` field (now requested) -> server-side
+  PTR lookup (4 s timeout) -> null ("Not detected"). The IP itself is
+  never shown as a hostname. Empty provider strings normalize to null.
+- New additive response fields only: orgSource, hostnameSource. No field
+  removed. Tests: 42/42 Vitest (13 network-info tests incl. ASN parsing,
+  empty->null, RDAP fixtures, mocked-fetch route integration).
