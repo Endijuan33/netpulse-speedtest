@@ -7,7 +7,7 @@ import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit
  * origin is simply the server handling this request.
  */
 export async function GET(req: Request) {
-  if (!checkRateLimit(getClientIp(req))) return rateLimitResponse();
+  if (!checkRateLimit(getClientIp(req), 120, 60_000, "servers")) return rateLimitResponse();
   const host = req.headers.get("host") ?? "unknown";
   return Response.json({
     servers: [

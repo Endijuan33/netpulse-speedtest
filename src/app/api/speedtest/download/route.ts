@@ -8,7 +8,7 @@ import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit
  * cannot be served from a cache. Same-origin only: no CORS headers are set.
  */
 export async function GET(req: Request) {
-  if (!checkRateLimit(getClientIp(req), 60)) return rateLimitResponse();
+  if (!checkRateLimit(getClientIp(req), 60, 60_000, "download")) return rateLimitResponse();
   const url = new URL(req.url);
   const parsed = downloadQuerySchema.safeParse({ bytes: url.searchParams.get("bytes") ?? undefined });
   if (!parsed.success) {

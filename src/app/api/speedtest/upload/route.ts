@@ -4,7 +4,7 @@ const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
 
 /** Reads and discards the body, counting bytes actually received. Never stored. */
 export async function POST(req: Request) {
-  if (!checkRateLimit(getClientIp(req), 60)) return rateLimitResponse();
+  if (!checkRateLimit(getClientIp(req), 60, 60_000, "upload")) return rateLimitResponse();
   if (!req.body) return Response.json({ error: "empty_body" }, { status: 400 });
   const start = performance.now();
   const reader = req.body.getReader();

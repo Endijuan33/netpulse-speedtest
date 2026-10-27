@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { isValidShareId } from "@/lib/share";
-import type { SpeedResult } from "@/lib/validation";
+import { speedResultSchema, type SpeedResult } from "@/lib/validation";
 
 export default function SharedResultPage() {
   const params = useParams<{ id: string }>();
@@ -16,8 +16,13 @@ export default function SharedResultPage() {
     const frag = window.location.hash.slice(1);
     if (!frag) { setState("missing"); return; }
     try {
-      const decoded = JSON.parse(decodeURIComponent(escape(atob(frag)))) as SpeedResult;
-      setResult(decoded);
+      const decoded = JSON.parse(decodeURIComponent(escape(atob(frag)))) as unknown;
+      const parsed = speedResultSchema.safeParse(decoded);
+      if (!parsed.success) {
+        setState("invalid");
+        return;
+      }
+      setResult(parsed.data);
       setState("ok");
     } catch {
       setState("missing");

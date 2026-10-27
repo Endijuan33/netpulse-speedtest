@@ -4,7 +4,7 @@ import { measureHost, resolveWithResolvers } from "@/lib/diagnostics";
 import { diagnosticsQuerySchema } from "@/lib/validation";
 
 export async function GET(req: Request) {
-  if (!checkRateLimit(getClientIp(req))) return rateLimitResponse();
+  if (!checkRateLimit(getClientIp(req), 120, 60_000, "diagnostics")) return rateLimitResponse();
   const url = new URL(req.url);
   const parsed = diagnosticsQuerySchema.safeParse({ host: url.searchParams.get("host") ?? undefined });
   if (!parsed.success) return Response.json({ error: "invalid_host" }, { status: 400 });

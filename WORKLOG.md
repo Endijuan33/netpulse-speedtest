@@ -58,3 +58,30 @@ All gates run in ~/workspace/netpulse, Node v24.22.1, pnpm 10.18.3.
 - pnpm was not preinstalled; installed globally via npm (`pnpm@10.18.3`).
   corepack is absent in this sandbox, so `pnpm` is used directly.
 - No secrets were created or committed. `.env.example` contains no real values.
+
+## 2026-10-27 — bug hunt (follow-up, see BUGS.md)
+
+- Upload 0 Mbps root cause: `crypto.getRandomValues` on a 512 KiB buffer
+  throws QuotaExceededError (>64 KiB/call) outside the fetch try/catch.
+  Fixed with chunked `fillRandomBytes()` + res.ok checks + throw on total
+  failure instead of silent 0. Playwright proof: Upload 17.03 Mbps local.
+- Loaded latency was duplicated (one ping set into both fields). Now
+  sampled concurrently during each transfer phase (local: 112.73 / 177.57 ms).
+- Print no longer calls window.print() on the dashboard; dedicated
+  /print/[id] tab instead (Playwright-verified, dialog itself unautomatable).
+- Share 400 on local runs: null ISP from network-info failed Zod. Fixed by
+  null->undefined normalization at engine + share payload.
+- Diagnostics hung forever when UDP resolvers blocked: 4 s per-resolver
+  timeouts + 30 s page fetch timeout. Sandbox resolvers now report timeout
+  errors per row instead of hanging.
+- CSP connect-src now includes ipv4/ipv6.icanhazip.com (was blocking the
+  IP connectivity check). Rate-limit buckets now scoped per route. SSRF
+  guard extended (CGNAT, benchmarking, TEST-NET, mapped IPv6); 9/9 bypass
+  attempts -> 403. CSV escaping, share-page Zod validation, dashboard
+  timer race, diagnostics IP timeouts also fixed.
+- Dependency upgrades after manual advisory review: Next 15.5.7 -> 15.5.28,
+  eslint-config-next -> 15.5.28, Zod 4.1.8 -> 4.6.7 (critical/high GHSA
+  coverage; pnpm audit itself blocked in sandbox: ECONNRESET).
+- Gates this round: typecheck 0 errors, lint 0 errors 0 warnings,
+  Vitest 24/24, build success 0 warnings, Playwright regression 5/5,
+  Playwright smoke 5/5, console page errors in upload test 0.

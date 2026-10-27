@@ -6,9 +6,12 @@ import { POST as upload } from "../src/app/api/speedtest/upload/route";
 import { GET as diagnostics } from "../src/app/api/diagnostics/route";
 import { GET as servers } from "../src/app/api/servers/route";
 import { POST as share } from "../src/app/api/share/route";
-import { isAllowedDiagnosticHost } from "../src/lib/ssrf";
+import { isAllowedDiagnosticHost, isPrivateOrReservedIp } from "../src/lib/ssrf";
 import { isValidShareId } from "../src/lib/share";
 import { speedResultSchema } from "../src/lib/validation";
+import { checkRateLimit } from "../src/lib/rate-limit";
+import { toCsv } from "../src/lib/history";
+import { fillRandomBytes } from "../src/lib/speedtest";
 
 const req = (url: string, init?: RequestInit) => new Request(url, init);
 
@@ -59,6 +62,55 @@ describe("api routes", () => {
   it("share rejects invalid payloads", async () => {
     const res = await share(req("http://localhost/api/share", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ result: { id: 1 } }) }));
     expect(res.status).toBe(400);
+  });
+});
+
+describe("upload payload construction (regression: upload 0 Mbps)", () => {
+  it("fills a 512 KiB buffer without throwing (getRandomValues limit is 64 KiB per call)", () => {
+    const buf = new Uint8Array(512 * 1024);
+    expect(() => fillRandomBytes(buf)).not.toThrow();
+    expect(buf.some((b) => b !== 0)).toBe(true);
+  });
+  it("fills a 64 KiB boundary buffer", () => {
+    const buf = new Uint8Array(65536);
+    expect(() => fillRandomBytes(buf)).not.toThrow();
+  });
+});
+
+describe("SSRF guard extended ranges", () => {
+  it("rejects CGNAT, benchmarking, TEST-NET and mapped private addresses", () => {
+    expect(isPrivateOrReservedIp("100.64.0.1")).toBe(true);
+    expect(isPrivateOrReservedIp("198.18.0.1")).toBe(true);
+    expect(isPrivateOrReservedIp("203.0.113.1")).toBe(true);
+    expect(isPrivateOrReservedIp("::ffff:127.0.0.1")).toBe(true);
+    expect(isPrivateOrReservedIp("::ffff:7f00:1")).toBe(true);
+    expect(isPrivateOrReservedIp("2001:db8::1")).toBe(true);
+  });
+  it("still allows public addresses", () => {
+    expect(isPrivateOrReservedIp("1.1.1.1")).toBe(false);
+    expect(isPrivateOrReservedIp("8.8.8.8")).toBe(false);
+  });
+});
+
+describe("rate-limit scopes", () => {
+  it("keeps buckets separate per route scope", () => {
+    const ip = "203.0.113.99";
+    expect(checkRateLimit(ip, 1, 60_000, "scope-a-test")).toBe(true);
+    expect(checkRateLimit(ip, 1, 60_000, "scope-a-test")).toBe(false);
+    expect(checkRateLimit(ip, 1, 60_000, "scope-b-test")).toBe(true);
+  });
+});
+
+describe("CSV escaping", () => {
+  it("quotes fields containing commas or quotes", () => {
+    const result = {
+      id: "np-csv", timestamp: "2026-10-27T00:00:00.000Z", downloadMbps: 10, uploadMbps: 5,
+      idleLatencyMs: 1, downloadLatencyMs: 2, uploadLatencyMs: 3, jitterMs: 0, maxJitterMs: 0,
+      httpRequestLossPercent: 0, server: 'Origin, "quoted"', isp: "A,B", hideIp: false,
+    };
+    const csv = toCsv([result]);
+    expect(csv).toContain('"Origin, ""quoted"""');
+    expect(csv).toContain('"A,B"');
   });
 });
 

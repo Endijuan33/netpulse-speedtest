@@ -1,4 +1,5 @@
 import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
+import { isPrivateOrReservedIp } from "@/lib/ssrf";
 
 interface IpApiResponse {
   status?: string;
@@ -15,7 +16,9 @@ interface IpApiResponse {
 }
 
 function isPublicIp(ip: string): boolean {
-  return !/^(10\.|127\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|::1|fe80:|fc00:|fd)/.test(ip);
+  // Shared with the diagnostics SSRF guard: covers CGNAT, link-local,
+  // benchmarking, TEST-NET and IPv4-mapped IPv6 ranges the old regex missed.
+  return !isPrivateOrReservedIp(ip);
 }
 
 async function fetchJson(url: string, timeoutMs = 5000): Promise<unknown> {
@@ -39,7 +42,7 @@ async function fetchJson(url: string, timeoutMs = 5000): Promise<unknown> {
  * are never looked up — they return `unavailable` flags instead of invented data.
  */
 export async function GET(req: Request) {
-  if (!checkRateLimit(getClientIp(req))) return rateLimitResponse();
+  if (!checkRateLimit(getClientIp(req), 120, 60_000, "network-info")) return rateLimitResponse();
   const ip = getClientIp(req);
   const base = {
     ip: ip === "unknown" ? null : ip,

@@ -26,6 +26,19 @@ const RESOLVERS = [
   { name: "Quad9 DNS", server: "9.9.9.9" },
 ];
 
+/**
+ * Race a promise against a timeout. Without this, a hung DNS resolver
+ * (e.g. UDP blocked in a sandbox) hangs the whole diagnostics endpoint
+ * forever — the UI sat on "Running…" for 60 s+ with no error at all.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timeout after ${ms} ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 async function timed<T>(fn: () => Promise<T>): Promise<{ ms: number; value: T } | { ms: null; value: null; error: string }> {
   const start = performance.now();
   try {
@@ -42,7 +55,7 @@ export async function resolveWithResolvers(host: string): Promise<ResolverResult
     const resolver = new dns.Resolver();
     resolver.setServers([r.server]);
     const out = await timed(() =>
-      resolver.resolve4(host).then((a) => a.length),
+      withTimeout(resolver.resolve4(host).then((a) => a.length), 4000, `${r.name} DNS`),
     );
     results.push({
       resolver: r.name,
@@ -52,7 +65,7 @@ export async function resolveWithResolvers(host: string): Promise<ResolverResult
       error: "error" in out ? out.error : null,
     });
   }
-  const sys = await timed(() => dns.lookup(host, { all: true }));
+  const sys = await timed(() => withTimeout(dns.lookup(host, { all: true }), 4000, "System DNS"));
   results.push({
     resolver: "System resolver",
     server: "system",
@@ -64,7 +77,7 @@ export async function resolveWithResolvers(host: string): Promise<ResolverResult
 }
 
 export async function measureHost(host: string, port = 443): Promise<HostTiming> {
-  const dnsOut = await timed(() => dns.lookup(host));
+  const dnsOut = await timed(() => withTimeout(dns.lookup(host), 4000, "DNS lookup"));
   if (dnsOut.ms === null) {
     return { host, dnsMs: null, tcpMs: null, tlsMs: null, httpMs: null, status: null, error: "error" in dnsOut ? dnsOut.error : "dns failed" };
   }

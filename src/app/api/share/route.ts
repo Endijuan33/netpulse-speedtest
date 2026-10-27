@@ -10,7 +10,7 @@ import { shareRequestSchema } from "@/lib/validation";
  * database-backed public page.
  */
 export async function POST(req: Request) {
-  if (!checkRateLimit(getClientIp(req), 30)) return rateLimitResponse();
+  if (!checkRateLimit(getClientIp(req), 30, 60_000, "share")) return rateLimitResponse();
   let body: unknown;
   try {
     body = await req.json();

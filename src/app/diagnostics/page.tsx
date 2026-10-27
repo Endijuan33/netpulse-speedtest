@@ -20,7 +20,9 @@ export default function DiagnosticsPage() {
   const run = async (h: string) => {
     setLoading(true); setError(null);
     try {
-      const res = await fetch(`/api/diagnostics?host=${encodeURIComponent(h)}`);
+      // Client-side timeout as well: even with server-side timeouts, a
+      // stalled response must surface as an error, never as "Running…" forever.
+      const res = await fetch(`/api/diagnostics?host=${encodeURIComponent(h)}`, { signal: AbortSignal.timeout(30000) });
       if (!res.ok) { const j = await res.json().catch(() => ({})); setError((j as { message?: string }).message ?? "Diagnostics failed."); setData(null); return; }
       setData(await res.json());
     } catch { setError("Diagnostics request failed."); }
@@ -30,8 +32,15 @@ export default function DiagnosticsPage() {
   useEffect(() => {
     void run("cloudflare.com");
     // IPv4/IPv6 connectivity: distinct endpoints, failures shown, not hidden.
-    fetch("https://ipv4.icanhazip.com/").then((r) => r.text()).then((t) => setV4(`reachable (${t.trim()})`)).catch(() => setV4("unreachable"));
-    fetch("https://ipv6.icanhazip.com/").then((r) => r.text()).then((t) => setV6(`reachable (${t.trim()})`)).catch(() => setV6("unreachable"));
+    // 5 s timeout each: without it a hung endpoint leaves "checking…" forever.
+    const check = (url: string, set: (v: string) => void) => {
+      fetch(url, { signal: AbortSignal.timeout(5000) })
+        .then((r) => (r.ok ? r.text() : Promise.reject(new Error("failed"))))
+        .then((t) => set(`reachable (${t.trim()})`))
+        .catch(() => set("unreachable"));
+    };
+    check("https://ipv4.icanhazip.com/", setV4);
+    check("https://ipv6.icanhazip.com/", setV6);
   }, []);
 
   const ms = (v: number | null) => (v === null ? "—" : `${v} ms`);

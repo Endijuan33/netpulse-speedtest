@@ -26,7 +26,7 @@ const nextConfig: NextConfig = {
               "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
-              "connect-src 'self' https://ip-api.com https://ipapi.co",
+              "connect-src 'self' https://ip-api.com https://ipapi.co https://ipv4.icanhazip.com https://ipv6.icanhazip.com",
               "font-src 'self'",
               "object-src 'none'",
               "base-uri 'self'",

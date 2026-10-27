@@ -50,10 +50,26 @@ export async function deleteResult(id: string): Promise<void> {
   db.close();
 }
 
+export async function getResult(id: string): Promise<SpeedResult | null> {
+  const db = await openDb();
+  const item = await new Promise<SpeedResult | undefined>((resolve, reject) => {
+    const req = db.transaction(STORE, "readonly").objectStore(STORE).get(id);
+    req.onsuccess = () => resolve(req.result as SpeedResult | undefined);
+    req.onerror = () => reject(req.error);
+  });
+  db.close();
+  return item ?? null;
+}
+
+function csvCell(v: string | number): string {
+  const s = String(v);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
 export function toCsv(results: SpeedResult[]): string {
   const header = "id,timestamp,downloadMbps,uploadMbps,idleLatencyMs,jitterMs,httpRequestLossPercent,server,isp";
   const rows = results.map((r) =>
-    [r.id, r.timestamp, r.downloadMbps, r.uploadMbps, r.idleLatencyMs, r.jitterMs, r.httpRequestLossPercent, `"${r.server}"`, `"${r.isp ?? ""}"`].join(","),
+    [r.id, r.timestamp, r.downloadMbps, r.uploadMbps, r.idleLatencyMs, r.jitterMs, r.httpRequestLossPercent, r.server, r.isp ?? ""].map(csvCell).join(","),
   );
   return [header, ...rows].join("\n");
 }

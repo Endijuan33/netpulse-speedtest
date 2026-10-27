@@ -48,7 +48,10 @@ export default function Dashboard() {
     setRunning(true); setError(null); setResult(null); setShareLink(null);
     setDlSamples([]); setUlSamples([]); setCurrent(0); setElapsed(0); setProgress(0);
     startRef.current = Date.now();
-    timerRef.current = setInterval(() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)), 500);
+    // Timer is local to this run: the old shared timerRef meant a second
+    // start's finally() cleared the new run's interval and froze Elapsed.
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)), 500);
+    timerRef.current = timer;
     const short = new URLSearchParams(window.location.search).get("testMode") === "short";
     try {
       const { result: partial } = await runSpeedTest(
@@ -69,15 +72,28 @@ export default function Dashboard() {
       else setError("Test failed. Check your connection and try again.");
     } finally {
       setRunning(false); setPhase(null);
-      if (timerRef.current) clearInterval(timerRef.current);
+      clearInterval(timer);
+      if (timerRef.current === timer) timerRef.current = null;
     }
   }, [hideIp]);
 
   const cancel = () => controllerRef.current?.abort();
 
+  const printReport = () => {
+    // Print in a dedicated tab, never window.print() on the dashboard:
+    // a native print dialog that hangs (seen in automated browsers) used to
+    // freeze the dashboard tab itself. The print tab auto-prints, and if its
+    // dialog hangs, only that tab is affected; the dashboard stays usable.
+    if (!result) return;
+    const win = window.open(`/print/${result.id}`, "_blank", "noopener");
+    if (!win) setToast("Popup blocked — allow popups for this site, then try Print report again.");
+  };
+
   const share = async () => {
     if (!result) return;
-    const payload = { ...result, publicIp: hideIp ? undefined : result.publicIp };
+    // Strip nulls (e.g. an ISP of null from older stored results): the share
+    // schema accepts strings or absence, never null — null used to 400 here.
+    const payload = { ...result, isp: result.isp ?? undefined, publicIp: hideIp ? undefined : (result.publicIp ?? undefined) };
     const res = await fetch("/api/share", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ result: payload }) });
     if (!res.ok) { setToast("Sharing failed. Try again."); return; }
     const { id } = (await res.json()) as { id: string };
@@ -190,7 +206,7 @@ export default function Dashboard() {
             <button onClick={() => downloadFile(JSON.stringify(result, null, 2), `${result.id}.json`, "application/json")} className="rounded-md border px-4 py-2 text-sm">Export JSON</button>
             <button onClick={() => downloadFile(toCsv([result]), `${result.id}.csv`, "text/csv")} className="rounded-md border px-4 py-2 text-sm">Export CSV</button>
             <button onClick={() => downloadFile(toTxt({ ...result, publicIp: hideIp ? undefined : result.publicIp }), `${result.id}.txt`, "text/plain")} className="rounded-md border px-4 py-2 text-sm">Export TXT</button>
-            <button onClick={() => window.print()} className="rounded-md border px-4 py-2 text-sm">Print report</button>
+            <button onClick={printReport} className="rounded-md border px-4 py-2 text-sm">Print report</button>
           </div>
           {shareLink && <p className="mt-3 break-all text-sm">Share link: <a className="text-blue-600 underline" href={shareLink}>{shareLink}</a></p>}
           <p className="mt-3 text-xs text-gray-500">Sharing is fragment-encoded (no server-side result store). Anyone with the link can read the payload in the fragment.</p>

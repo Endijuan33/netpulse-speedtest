@@ -32,6 +32,35 @@ export interface EngineOptions {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Fill a buffer with cryptographically random bytes, in chunks.
+ * Web Crypto's getRandomValues() throws QuotaExceededError for any single
+ * call over 65,536 bytes — a single 512 KiB call (the old upload code) threw
+ * on every attempt, outside the fetch try/catch, so every upload worker died
+ * instantly and the test silently reported 0 Mbps. Chunking fixes it.
+ */
+export function fillRandomBytes(buf: Uint8Array): void {
+  const CHUNK = 65536;
+  for (let offset = 0; offset < buf.byteLength; offset += CHUNK) {
+    crypto.getRandomValues(buf.subarray(offset, Math.min(buf.byteLength, offset + CHUNK)));
+  }
+}
+
+/** Ping loop that runs for the duration of a transfer phase: true loaded latency. */
+async function collectLoadedSamples(
+  signal: AbortSignal,
+  durationMs: number,
+  samples: number[],
+): Promise<void> {
+  const start = performance.now();
+  while (!signal.aborted && performance.now() - start < durationMs) {
+    const v = await pingOnce(signal);
+    if (v !== null) samples.push(v);
+    if (signal.aborted) break;
+    await sleep(1000);
+  }
+}
+
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number, signal: AbortSignal): Promise<Response> {
   const controller = new AbortController();
   const onAbort = () => controller.abort();
@@ -50,6 +79,7 @@ async function pingOnce(signal: AbortSignal): Promise<number | null> {
   const start = performance.now();
   try {
     const res = await fetchWithTimeout(`/api/ping?t=${Date.now()}`, { cache: "no-store" }, 5000, signal);
+    if (!res.ok) return null;
     await res.arrayBuffer();
     return performance.now() - start;
   } catch {
@@ -79,12 +109,16 @@ async function measureDownload(
   signal: AbortSignal,
   onSample: (s: LiveSample, mbps: number) => void,
   short: boolean,
-): Promise<number> {
+): Promise<{ mbps: number; loadedSamples: number[] }> {
   const durationMs = short ? 3000 : 10000;
   const start = performance.now();
   let totalBytes = 0;
   let lastBytes = 0;
   let lastTime = start;
+  let failures = 0;
+  let successes = 0;
+  const loadedSamples: number[] = [];
+  const loaded = collectLoadedSamples(signal, durationMs, loadedSamples);
   const workers: Promise<void>[] = [];
   for (let w = 0; w < 4; w++) {
     workers.push(
@@ -93,7 +127,10 @@ async function measureDownload(
         while (!signal.aborted && performance.now() - start < durationMs) {
           try {
             const res = await fetchWithTimeout(`/api/speedtest/download?bytes=${size}`, { cache: "no-store" }, 15000, signal);
-            if (!res.body) break;
+            if (!res.ok || !res.body) {
+              failures += 1;
+              break;
+            }
             const reader = res.body.getReader();
             for (;;) {
               const { done, value } = await reader.read();
@@ -101,7 +138,9 @@ async function measureDownload(
               totalBytes += value.byteLength;
               if (signal.aborted) break;
             }
+            successes += 1;
           } catch {
+            failures += 1;
             break;
           }
           // Scale next chunk with observed throughput (bounded 1–32 MB).
@@ -122,8 +161,11 @@ async function measureDownload(
       onSample({ t: Math.round(now - start), mbps: Math.round(mbps * 100) / 100 }, bytesToMbps(totalBytes, now - start));
     }
   })();
-  await Promise.allSettled([...workers, sampler]);
-  return bytesToMbps(totalBytes, performance.now() - start);
+  await Promise.allSettled([...workers, sampler, loaded]);
+  if (totalBytes === 0 && failures > 0 && successes === 0 && !signal.aborted) {
+    throw new Error("Download failed: no data was received.");
+  }
+  return { mbps: bytesToMbps(totalBytes, performance.now() - start), loadedSamples };
 }
 
 /** Upload measurement: real random payloads POSTed and counted server-side. */
@@ -131,22 +173,36 @@ async function measureUpload(
   signal: AbortSignal,
   onSample: (s: LiveSample, mbps: number) => void,
   short: boolean,
-): Promise<number> {
+): Promise<{ mbps: number; loadedSamples: number[] }> {
   const durationMs = short ? 3000 : 10000;
   const start = performance.now();
   let totalBytes = 0;
+  let failures = 0;
+  let successes = 0;
+  const loadedSamples: number[] = [];
+  const loaded = collectLoadedSamples(signal, durationMs, loadedSamples);
   const workers: Promise<void>[] = [];
   for (let w = 0; w < 3; w++) {
     workers.push(
       (async () => {
         while (!signal.aborted && performance.now() - start < durationMs) {
           const buf = new Uint8Array(512 * 1024);
-          crypto.getRandomValues(buf);
           try {
+            fillRandomBytes(buf);
             const res = await fetchWithTimeout("/api/speedtest/upload", { method: "POST", body: buf as BodyInit, headers: { "Content-Type": "application/octet-stream" } }, 15000, signal);
+            if (!res.ok) {
+              failures += 1;
+              break;
+            }
             const json = (await res.json()) as { bytesReceived?: number };
-            totalBytes += json.bytesReceived ?? buf.byteLength;
+            if (typeof json.bytesReceived !== "number") {
+              failures += 1;
+              break;
+            }
+            totalBytes += json.bytesReceived;
+            successes += 1;
           } catch {
+            failures += 1;
             break;
           }
         }
@@ -165,8 +221,11 @@ async function measureUpload(
       onSample({ t: Math.round(now - start), mbps: Math.round(mbps * 100) / 100 }, bytesToMbps(totalBytes, now - start));
     }
   })();
-  await Promise.allSettled([...workers, sampler]);
-  return bytesToMbps(totalBytes, performance.now() - start);
+  await Promise.allSettled([...workers, sampler, loaded]);
+  if (totalBytes === 0 && failures > 0 && successes === 0 && !signal.aborted) {
+    throw new Error("Upload failed: no data was accepted by the server.");
+  }
+  return { mbps: bytesToMbps(totalBytes, performance.now() - start), loadedSamples };
 }
 
 /**
@@ -196,7 +255,13 @@ export async function runSpeedTest(
   let networkInfo: { ip?: string; isp?: string } = {};
   try {
     const res = await fetchWithTimeout("/api/network-info", {}, 6000, signal);
-    if (res.ok) networkInfo = (await res.json()) as typeof networkInfo;
+    if (res.ok) {
+      const raw = (await res.json()) as { ip?: string | null; isp?: string | null };
+      // Normalize nulls to undefined: the API returns null for unknown
+      // fields, but SpeedResult's Zod schema rejects null — a null ISP used
+      // to make /api/share fail validation ("Sharing failed") on local runs.
+      networkInfo = { ip: raw.ip ?? undefined, isp: raw.isp ?? undefined };
+    }
   } catch { /* network info is best-effort; test continues */ }
   throwIfAborted();
 
@@ -226,22 +291,30 @@ export async function runSpeedTest(
 
   events.onPhase("Measuring download");
   events.onProgress(38);
-  const downloadMbps = await measureDownload(signal, (s, cur) => { downloadSamples.push(s); events.onDownloadSample(s, cur); }, short);
+  const download = await measureDownload(signal, (s, cur) => { downloadSamples.push(s); events.onDownloadSample(s, cur); }, short);
   throwIfAborted();
 
   events.onPhase("Measuring upload");
   events.onProgress(58);
-  const uploadMbps = await measureUpload(signal, (s, cur) => { uploadSamples.push(s); events.onUploadSample(s, cur); }, short);
+  const upload = await measureUpload(signal, (s, cur) => { uploadSamples.push(s); events.onUploadSample(s, cur); }, short);
   throwIfAborted();
 
   events.onPhase("Measuring loaded latency");
   events.onProgress(78);
-  // Loaded latency: ping samples taken right after load phases (same HTTP
-  // timing method as idle latency, so the comparison is apples-to-apples).
-  const loaded = await pingSamples(short ? 3 : 5, signal);
-  const loadedStats = summarize(loaded.samples);
-  const downloadLatency = loadedStats.mean;
-  const uploadLatency = loadedStats.mean;
+  // Loaded latency is NOT re-measured here and duplicated: the samples above
+  // were collected by pinging concurrently with each transfer phase (same
+  // HTTP timing method as idle latency, so the comparison is apples-to-
+  // apples). This phase finalizes those two independent sample sets. If a
+  // phase somehow collected no sample (e.g. every ping failed), fall back to
+  // a short post-load ping set rather than reporting a fabricated 0.
+  const downloadLatency =
+    download.loadedSamples.length > 0
+      ? summarize(download.loadedSamples).mean
+      : summarize((await pingSamples(3, signal)).samples).mean;
+  const uploadLatency =
+    upload.loadedSamples.length > 0
+      ? summarize(upload.loadedSamples).mean
+      : summarize((await pingSamples(3, signal)).samples).mean;
   throwIfAborted();
 
   events.onPhase("Running diagnostics");
@@ -256,8 +329,8 @@ export async function runSpeedTest(
 
   return {
     result: {
-      downloadMbps: Math.round(downloadMbps * 100) / 100,
-      uploadMbps: Math.round(uploadMbps * 100) / 100,
+      downloadMbps: Math.round(download.mbps * 100) / 100,
+      uploadMbps: Math.round(upload.mbps * 100) / 100,
       idleLatencyMs: Math.round(idleStats.mean * 100) / 100,
       downloadLatencyMs: Math.round(downloadLatency * 100) / 100,
       uploadLatencyMs: Math.round(uploadLatency * 100) / 100,
