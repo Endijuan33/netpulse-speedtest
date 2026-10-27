@@ -209,3 +209,45 @@ All gates run in ~/workspace/netpulse, Node v24.22.1, pnpm 10.18.3.
   /history 232 kB, shared 103 kB), Playwright smoke 5/5 + regression 8/8,
   overflow 0 px on all 4 pages at 1440/390 px. CARTO tile math verified
   (Bekasi coords -> tile 3265/2119 @ z12, HTTP 200, 256x256 PNG).
+
+## 2026-10-28 — map tile source fix (CARTO watermark) + dashboard header icons
+
+- FAILURE (live 2026-10-28 01:20 WIB, /network, real public IP): CARTO dark_all
+  tiles rendered a repeating "API KEY REQUIRED" watermark — unauthenticated
+  CARTO basemaps now require a key. A tile URL returning HTTP 200 did NOT
+  prove real imagery (a watermark PNG also returns 200); the previous tile
+  check was misleading for exactly this reason.
+- FIX: tile source replaced with OpenStreetMap standard tiles
+  (tile.openstreetmap.org, keyless, no account, no cost), rendered dark via
+  CSS filter on the tile layer (invert 100% + hue-rotate 180deg + brightness
+  95% + contrast 90%). Attribution now "© OpenStreetMap contributors" only.
+  CSP img-src scoped from basemaps.cartocdn.com to tile.openstreetmap.org.
+  Marker, zoom +/-, recenter, tile-failure fallback to Open in Maps, and the
+  approximate-location disclaimer are unchanged.
+- PROOF (content, not status): Denver z12 tile 853/1554 fetched and
+  inspected — 36,760 bytes, 256 unique colours, no dominant colour (max
+  11%), land green/water blue/road beige = real urban map imagery; the
+  CARTO tile for comparison was 96% flat dark grey (16 colours). All 9
+  tiles of the Denver 3x3 grid fetched (25,120–36,748 bytes each) and
+  rendered in a local prod-build screenshot: streets and labels visible
+  (Berkeley, Highland, Five Points, City Park West, Cheesman Park),
+  dark-navy filter readable, blue marker on Denver, zoom/recenter controls
+  visible. Sandbox caveat, stated honestly: headless Chromium in this
+  sandbox cannot reach OSM directly (egress proxy auth + Playwright
+  proxy/localhost-bypass conflict, 4 attempts), so the screenshot served
+  the server-side-fetched real tile bytes via route fulfilment; the
+  browser->OSM hop itself is proven by the curl content analysis, and the
+  parent's live re-check on a real browser/IP is the final proof.
+- OSM POLICY FINDING (recorded, not hidden): OSM served its "403 Access
+  blocked" tile image to requests carrying a generic Chrome UA from the
+  shared sandbox egress IP (twice), while a distinctive app UA got real
+  tiles (twice, same IP/tile). This is an egress-IP/UA blocklist artefact,
+  not an app defect: OSM policy allows normal browser use, and production
+  browsers on ordinary IPs send their real UA. At this app's tiny volume,
+  OSM standard tiles are the correct keyless choice; if volume ever grows,
+  revisit with a dedicated tile host or cache.
+- SECOND FIX: Dashboard "Realtime Throughput" (blue TrendingUp chip) and
+  "Live test log" (green ScrollText chip) now use the same .np-icon-chip
+  treatment as other Dashboard headers. No log behaviour, chart data, or
+  measurement code changed.
+- Files: src/app/network/page.tsx, src/app/page.tsx, next.config.ts.

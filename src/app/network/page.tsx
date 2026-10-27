@@ -10,11 +10,15 @@ import {
 import { PageHeader, InfoCard, Skeleton, ErrorState, StatusBadge } from "@/components/ui";
 
 /**
- * Dark tile map without a mapping library: 3×3 CARTO dark_all tiles centred
- * on the provider coordinates, with working zoom/recentre controls. Tiles
- * are real map imagery (© OpenStreetMap contributors © CARTO), never a
- * screenshot, and coordinates are never hardcoded — they come from the
- * server-side lookup. If tiles fail to load, the Open in Maps link remains.
+ * Dark tile map without a mapping library: 3×3 OpenStreetMap standard tiles
+ * centred on the provider coordinates, rendered dark via a CSS filter on
+ * the tile layer (invert + hue-rotate, the standard keyless dark-mode
+ * technique). OSM tiles need no API key, account, or cost, and cannot
+ * watermark — unlike the previous CARTO endpoint, which started returning
+ * "API KEY REQUIRED" watermark tiles (verified live 2026-10-28). Tiles
+ * are real map imagery (© OpenStreetMap contributors), never a screenshot,
+ * and coordinates are never hardcoded — they come from the server-side
+ * lookup. If tiles fail to load, the Open in Maps link remains.
  */
 function DarkTileMap({ lat, lon }: { lat: number; lon: number }) {
   const [zoom, setZoom] = useState(12);
@@ -42,11 +46,11 @@ function DarkTileMap({ lat, lon }: { lat: number; lon: number }) {
   }
   return (
     <div className="relative mt-4 h-72 w-full overflow-hidden rounded-lg" style={{ background: "#0b1224" }} role="img" aria-label={`Approximate location map, ${lat}, ${lon}`}>
-      <div className="absolute" style={{ left: `calc(50% - ${px}px - 256px)`, top: `calc(50% - ${py}px - 256px)`, width: 768, height: 768 }}>
+      <div className="absolute" style={{ left: `calc(50% - ${px}px - 256px)`, top: `calc(50% - ${py}px - 256px)`, width: 768, height: 768, filter: "invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)" }}>
         {tiles.map((t) => (
           <Image
             key={`${t.x}-${t.y}-${zoom}`}
-            src={`https://basemaps.cartocdn.com/dark_all/${zoom}/${t.x}/${t.y}.png`}
+            src={`https://tile.openstreetmap.org/${zoom}/${t.x}/${t.y}.png`}
             alt=""
             width={256}
             height={256}
@@ -65,7 +69,7 @@ function DarkTileMap({ lat, lon }: { lat: number; lon: number }) {
         <button type="button" aria-label="Zoom out" onClick={() => setZoom((z) => Math.max(3, z - 1))} className="rounded-md border bg-[#101a30]/90 p-1.5" style={{ borderColor: "var(--np-border)" }}><Minus className="h-4 w-4" aria-hidden="true" /></button>
         <button type="button" aria-label="Recentre map" onClick={() => setZoom(12)} className="rounded-md border bg-[#101a30]/90 p-1.5" style={{ borderColor: "var(--np-border)" }}><LocateFixed className="h-4 w-4" aria-hidden="true" /></button>
       </div>
-      <p className="absolute bottom-1 left-2 text-[10px] text-white/60">© OpenStreetMap contributors © CARTO</p>
+      <p className="absolute bottom-1 left-2 text-[10px] text-white/60">© OpenStreetMap contributors</p>
     </div>
   );
 }
@@ -180,7 +184,7 @@ export default function NetworkPage() {
           ) : (
             <p className="mt-4 rounded-lg p-4 text-sm np-muted" style={{ background: "var(--np-elevated)" }}>No coordinates were returned, so no map can be shown.</p>
           )}
-          <p className="mt-2 text-[11px] np-muted">Dark map tiles: © OpenStreetMap contributors © CARTO. The previous light OSM iframe embed was blocked by this app&apos;s own Content-Security-Policy (no frame-src), so it rendered as blocked content in some browsers — the tile map fixes that.</p>
+          <p className="mt-2 text-[11px] np-muted">Dark map tiles: © OpenStreetMap contributors (standard tiles, rendered dark with a CSS filter — no API key). The previous light OSM iframe embed was blocked by this app&apos;s own Content-Security-Policy (no frame-src), so it rendered as blocked content in some browsers — the tile map fixes that.</p>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
             <span className="font-semibold">{[info.city, info.region, info.country].filter(Boolean).join(", ") || "Location unknown"}</span>
             {hasCoords && <span className="np-muted tabular-nums">{info.latitude}, {info.longitude} (approximate)</span>}

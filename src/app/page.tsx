@@ -33,8 +33,10 @@ import {
   MapPin,
   Play,
   RadioTower,
+  ScrollText,
   Server,
   Signal,
+  TrendingUp,
   X,
 } from "lucide-react";
 
@@ -436,7 +438,7 @@ export default function Dashboard() {
       <div className="grid gap-4 xl:grid-cols-12">
         <section className="np-card p-5 xl:col-span-8" aria-label="Realtime throughput">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold">Realtime Throughput</h2>
+            <h2 className="flex items-center gap-2 font-semibold"><span className="np-icon-chip" style={{ color: "#00a8ff", background: "#00a8ff22" }}><TrendingUp aria-hidden="true" /></span>Realtime Throughput</h2>
             <p className="text-xs np-muted"><span className="text-[#00a8ff]">● Download</span> <span className="text-[#a855f7]">● Upload</span></p>
           </div>
           <div className="mt-4 h-64" aria-label="Live throughput chart">
@@ -462,7 +464,7 @@ export default function Dashboard() {
 
         <section className="np-card p-5 xl:col-span-4" aria-label="Live test log">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold">Live test log</h2>
+            <h2 className="flex items-center gap-2 font-semibold"><span className="np-icon-chip" style={{ color: "#10b981", background: "#10b98122" }}><ScrollText aria-hidden="true" /></span>Live test log</h2>
             <StatusBadge tone={running ? "warn" : result ? "ok" : "neutral"}>{running ? "Testing" : result ? "Testing completed" : "Idle"}</StatusBadge>
           </div>
           {log.length === 0 ? (
