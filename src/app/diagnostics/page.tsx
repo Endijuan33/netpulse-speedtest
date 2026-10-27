@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { PageHeader, StatusBadge, TimingTimeline, EmptyState, ErrorState } from "@/components/ui";
+import { useEffect, useState, type ReactNode } from "react";
+import {
+  BookOpen, CheckCircle2, Cloud, FileText, Flag, Globe, History, Link2, Lock,
+  Network, Route, Settings, Shield, Timer, Zap,
+} from "lucide-react";
+import { CopyButton, PageHeader, StatusBadge, TimingTimeline, EmptyState, ErrorState } from "@/components/ui";
 
 interface Diag {
   host: string;
@@ -12,13 +16,21 @@ interface Diag {
 
 type Tab = "dns" | "timing" | "connectivity" | "traceroute" | "http";
 const PRESETS = ["cloudflare.com", "google.com", "youtube.com", "openai.com", "github.com", "vercel.com"];
-const TABS: { id: Tab; label: string }[] = [
-  { id: "dns", label: "DNS Lookup" },
-  { id: "timing", label: "Connection Timing" },
-  { id: "connectivity", label: "IP Connectivity" },
-  { id: "traceroute", label: "Trace Route" },
-  { id: "http", label: "HTTP Test" },
+const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
+  { id: "dns", label: "DNS Lookup", icon: <Globe className="h-4 w-4" aria-hidden="true" /> },
+  { id: "timing", label: "Connection Timing", icon: <Timer className="h-4 w-4" aria-hidden="true" /> },
+  { id: "connectivity", label: "IP Connectivity", icon: <Network className="h-4 w-4" aria-hidden="true" /> },
+  { id: "traceroute", label: "Trace Route", icon: <Route className="h-4 w-4" aria-hidden="true" /> },
+  { id: "http", label: "HTTP Test", icon: <FileText className="h-4 w-4" aria-hidden="true" /> },
 ];
+// Neutral glyphs for resolvers — no trademarked brand logos are reproduced.
+const RESOLVER_ICONS: Record<string, ReactNode> = {
+  "Cloudflare DNS": <Cloud className="h-4 w-4 text-[#f59e0b]" aria-hidden="true" />,
+  "Google DNS": <Globe className="h-4 w-4 text-[#00a8ff]" aria-hidden="true" />,
+  "Quad9 DNS": <Shield className="h-4 w-4 text-[#a855f7]" aria-hidden="true" />,
+  OpenDNS: <Globe className="h-4 w-4 text-[#f59e0b]" aria-hidden="true" />,
+  "System resolver": <Settings className="h-4 w-4 text-[#94a3b8]" aria-hidden="true" />,
+};
 
 export default function DiagnosticsPage() {
   const [host, setHost] = useState("cloudflare.com");
@@ -124,7 +136,7 @@ export default function DiagnosticsPage() {
         description="Test DNS resolution, connection timing and network connectivity to identify issues. Server-side measurements — browser-side timings may differ, and neither is a universal measurement. Only allowlisted hosts (or public DNS names resolving to public IPs) may be probed; SSRF targets are rejected."
         actions={
           <details className="np-card px-4 py-2 text-sm">
-            <summary className="cursor-pointer font-medium">Learn — How diagnostics work</summary>
+            <summary className="flex cursor-pointer items-center gap-2 font-medium"><BookOpen className="h-4 w-4 text-[#00a8ff]" aria-hidden="true" />Learn — How diagnostics work</summary>
             <p className="mt-2 max-w-md text-xs np-muted">
               DNS rows are real resolver queries from the server. Connection timing measures DNS, TCP, TLS and HTTP separately. These are HTTP-layer measurements, never ICMP ping or packet-level loss. Trace Route on serverless hosting cannot use raw ICMP/UDP, so it is not simulated — see that tab for the application-layer path actually measured.
             </p>
@@ -142,7 +154,7 @@ export default function DiagnosticsPage() {
           <button type="submit" disabled={loading} className="np-btn-primary px-5 py-2 text-sm disabled:opacity-50">{loading ? "Running…" : "▶ Run Diagnostics"}</button>
         </form>
         <div className="mt-4">
-          <p className="text-xs font-semibold np-muted">Quick Test — popular domains for quick testing</p>
+          <p className="flex items-center gap-1.5 text-xs font-semibold np-muted"><Zap className="h-4 w-4 text-[#00a8ff]" aria-hidden="true" />Quick Test — popular domains for quick testing</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {PRESETS.map((p) => (
               <button key={p} type="button" onClick={() => { setHost(p); void run(p); }} className={`rounded-full border px-3 py-1.5 text-xs ${host === p ? "bg-[#2563ff] text-white" : ""}`} style={{ borderColor: "var(--np-border)" }}>
@@ -153,16 +165,19 @@ export default function DiagnosticsPage() {
         </div>
         {error && <div className="mt-4"><ErrorState>{error}</ErrorState></div>}
         {recent.length > 0 && (
-          <p className="mt-3 text-xs np-muted">
-            Recent tests: {recent.map((r) => `${r.host} (${new Date(r.at).toLocaleTimeString()}, ${r.ok ? "ok" : "failed"})`).join(" · ")}
+          <p className="mt-3 flex flex-wrap items-center gap-1.5 text-xs np-muted">
+            <History className="h-4 w-4 text-[#00a8ff]" aria-hidden="true" />Recent tests:
+            {recent.map((r) => (
+              <span key={`${r.host}-${r.at}`} className="np-elevated px-2 py-0.5">{r.host} ({new Date(r.at).toLocaleTimeString()}, {r.ok ? "ok" : "failed"})</span>
+            ))}
           </p>
         )}
       </section>
 
       <div className="flex flex-wrap gap-2" role="tablist" aria-label="Diagnostic sections">
         {TABS.map((t) => (
-          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={`rounded-full border px-4 py-2 text-sm ${tab === t.id ? "np-tab-active" : ""}`} style={{ borderColor: "var(--np-border)" }}>
-            {t.label}
+          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm ${tab === t.id ? "np-tab-active" : ""}`} style={{ borderColor: "var(--np-border)" }}>
+            {t.icon}{t.label}
           </button>
         ))}
       </div>
@@ -178,9 +193,9 @@ export default function DiagnosticsPage() {
               <tbody>
                 {data.resolvers.map((r) => (
                   <tr key={r.resolver} className="border-t" style={{ borderColor: "var(--np-border)" }}>
-                    <td className="py-2 pr-2 font-medium">{r.resolver}</td>
+                    <td className="py-2 pr-2 font-medium"><span className="flex items-center gap-2">{RESOLVER_ICONS[r.resolver] ?? <Globe className="h-4 w-4" aria-hidden="true" />}{r.resolver}</span></td>
                     <td className="pr-2">{r.server}</td>
-                    <td className="pr-2 break-all">{r.address ?? "—"}</td>
+                    <td className="pr-2 break-all"><span className="flex items-center gap-1">{r.address ?? "—"}{r.address && <CopyButton text={r.address} label={`Copy resolved IP for ${r.resolver}`} />}</span></td>
                     <td className="pr-2 tabular-nums">{ms(r.timeMs)}</td>
                     <td>{r.error ? <StatusBadge tone="bad">{r.error}</StatusBadge> : <StatusBadge tone="ok">✓ OK</StatusBadge>}</td>
                   </tr>
@@ -195,6 +210,21 @@ export default function DiagnosticsPage() {
       {data && tab === "timing" && (
         <section className="np-card p-5" aria-label="Connection timing">
           <h2 className="font-semibold">Connection Timing — {data.host} ({data.timing.resolvedIp ?? "IP unknown"})</h2>
+          <div className="mt-4 flex flex-wrap items-center gap-4 text-center text-xs">
+            {[
+              { icon: <Globe className="h-4 w-4" aria-hidden="true" />, label: "DNS", ms: data.timing.dnsMs, color: "#00a8ff" },
+              { icon: <Link2 className="h-4 w-4" aria-hidden="true" />, label: "TCP Connect", ms: data.timing.tcpMs, color: "#2563ff" },
+              { icon: <Lock className="h-4 w-4" aria-hidden="true" />, label: "TLS Handshake", ms: data.timing.tlsMs, color: "#a855f7" },
+              { icon: <FileText className="h-4 w-4" aria-hidden="true" />, label: "HTTP Response", ms: data.timing.httpMs, color: "#f59e0b" },
+              { icon: <Flag className="h-4 w-4" aria-hidden="true" />, label: "Total Time", ms: totalMs, color: "#10b981" },
+            ].map((s) => (
+              <div key={s.label} className="flex flex-col items-center gap-1">
+                <span className="np-icon-chip" style={{ color: s.color, background: `${s.color}22` }}>{s.icon}</span>
+                <span className="np-muted">{s.label}</span>
+                <span className="font-semibold tabular-nums">{ms(s.ms)}</span>
+              </div>
+            ))}
+          </div>
           <div className="mt-4">
             <TimingTimeline
               totalMs={totalMs}
@@ -267,14 +297,14 @@ export default function DiagnosticsPage() {
         <section className="np-card p-5" aria-label="Diagnostics summary">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-semibold">Diagnostics Summary</h2>
-            <button type="button" onClick={exportResults} className="rounded-full border px-4 py-2 text-sm" style={{ borderColor: "var(--np-border)" }}>↓ Export Results</button>
+            <button type="button" onClick={exportResults} className="flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm" style={{ borderColor: "var(--np-border)" }}><CheckCircle2 className="h-4 w-4 text-[#10b981]" aria-hidden="true" />Export Results</button>
           </div>
           <p className="text-sm np-muted">Overall results and recommendations. Execution duration: {durationMs !== null ? `${(durationMs / 1000).toFixed(1)} s` : "—"}.</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="np-elevated p-3"><p className="text-xs np-muted">DNS Resolution</p><p className="font-semibold">{dnsOk ? "Working properly" : "Failed"}</p></div>
-            <div className="np-elevated p-3"><p className="text-xs np-muted">Connection</p><p className="font-semibold">{data.timing.tcpMs !== null ? `Reachable (${totalMs?.toFixed(2) ?? "—"} ms)` : "Failed"}</p></div>
-            <div className="np-elevated p-3"><p className="text-xs np-muted">IPv6 Connectivity</p><p className="font-semibold">{v6Ok ? "Reachable" : "Unreachable"}</p></div>
-            <div className="np-elevated p-3"><p className="text-xs np-muted">HTTP</p><p className="font-semibold">{data.timing.status !== null ? `${data.timing.status} (${ms(data.timing.httpMs)})` : "Failed"}</p></div>
+            <div className="np-elevated p-3"><p className="flex items-center gap-1.5 text-xs np-muted"><Globe className="h-4 w-4 text-[#00a8ff]" aria-hidden="true" />DNS Resolution</p><p className="mt-1 font-semibold">{dnsOk ? "Working properly" : "Failed"}</p></div>
+            <div className="np-elevated p-3"><p className="flex items-center gap-1.5 text-xs np-muted"><Link2 className="h-4 w-4 text-[#2563ff]" aria-hidden="true" />Connection</p><p className="mt-1 font-semibold">{data.timing.tcpMs !== null ? `Reachable (${totalMs?.toFixed(2) ?? "—"} ms)` : "Failed"}</p></div>
+            <div className="np-elevated p-3"><p className="flex items-center gap-1.5 text-xs np-muted"><Network className="h-4 w-4 text-[#a855f7]" aria-hidden="true" />IPv6 Connectivity</p><p className="mt-1 font-semibold">{v6Ok ? "Reachable" : "Unreachable"}</p></div>
+            <div className="np-elevated p-3"><p className="flex items-center gap-1.5 text-xs np-muted"><FileText className="h-4 w-4 text-[#f59e0b]" aria-hidden="true" />HTTP</p><p className="mt-1 font-semibold">{data.timing.status !== null ? `${data.timing.status} (${ms(data.timing.httpMs)})` : "Failed"}</p></div>
           </div>
           <ul className="mt-4 list-disc space-y-1 pl-5 text-sm">
             {recommendations.map((r) => (<li key={r}>{r}</li>))}

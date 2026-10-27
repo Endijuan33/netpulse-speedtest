@@ -11,7 +11,12 @@ import {
 } from "@/lib/history";
 import type { SpeedResult } from "@/lib/validation";
 import { formatSpeed, readSpeedUnit, storeSpeedUnit, type SpeedUnit } from "@/lib/units";
-import { Trash2, Download, X } from "lucide-react";
+import {
+  Activity, ArrowDown, ArrowUp, BarChart3, Filter, Gauge as GaugeIcon,
+  RotateCcw, Trash2, Download, X,
+} from "lucide-react";
+import { Sparkline } from "@/components/ui";
+import { trendPercent, previousPeriodRange } from "@/lib/trends";
 
 type SortKey = "timestamp" | "downloadMbps" | "uploadMbps" | "idleLatencyMs" | "jitterMs";
 type SortDir = "asc" | "desc";
@@ -78,6 +83,36 @@ export default function HistoryPage() {
     avgPing: AVG(filtered.map((r) => r.idleLatencyMs)),
     avgJit: AVG(filtered.map((r) => r.jitterMs)),
   }), [filtered]);
+
+  // Honest trends: current filtered period vs the immediately preceding
+  // equal-length window from the same dataset (same ISP + search filters,
+  // ignoring only the date range itself). No previous records → null → "—".
+  const trends = useMemo<{ dl: number | null; ul: number | null; ping: number | null; jit: number | null }>(() => {
+    if (filtered.length === 0) return { dl: null, ul: null, ping: null, jit: null };
+    const stamps = filtered.map((r) => Date.parse(r.timestamp));
+    const start = from ? Date.parse(from) : Math.min(...stamps);
+    const end = to ? Date.parse(to) + 86_399_999 : Math.max(...stamps);
+    const prev = previousPeriodRange(start, end);
+    if (!prev) return { dl: null, ul: null, ping: null, jit: null };
+    const matchesFilters = (r: SpeedResult) => {
+      if (ispFilter && !(r.isp ?? "").toLowerCase().includes(ispFilter.toLowerCase())) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        if (![r.id, r.isp ?? "", r.server, r.publicIp ?? ""].join(" ").toLowerCase().includes(q)) return false;
+      }
+      return true;
+    };
+    const prevRows = all.filter((r) => {
+      const t = Date.parse(r.timestamp);
+      return t >= prev.start && t < prev.end && matchesFilters(r);
+    });
+    return {
+      dl: trendPercent(analytics.avgDl, prevRows.map((r) => r.downloadMbps)),
+      ul: trendPercent(analytics.avgUl, prevRows.map((r) => r.uploadMbps)),
+      ping: trendPercent(analytics.avgPing, prevRows.map((r) => r.idleLatencyMs)),
+      jit: trendPercent(analytics.avgJit, prevRows.map((r) => r.jitterMs)),
+    };
+  }, [filtered, all, from, to, ispFilter, search, analytics]);
 
   const downloadFile = (content: string, name: string, type: string) => {
     const blob = new Blob([content], { type });
@@ -159,22 +194,36 @@ export default function HistoryPage() {
       />
       {toast && <p className="rounded-lg p-3 text-sm" style={{ background: "#10b98122", color: "#10b981" }} role="status">{toast}</p>}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          ["Avg Download", fmt(analytics.avgDl)],
-          ["Avg Upload", fmt(analytics.avgUl)],
-          ["Avg Ping", fmt(analytics.avgPing, false)],
-          ["Avg Jitter", fmt(analytics.avgJit, false)],
-        ].map(([label, value]) => (
-          <div key={label} className="np-card p-5">
-            <p className="text-sm np-muted">{label}</p>
-            <p className="mt-1 text-2xl font-bold">{all.length === 0 ? "—" : value}</p>
-          </div>
-        ))}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        {([
+          { label: "Avg Download", value: fmt(analytics.avgDl), trend: trends.dl, goodUp: true, icon: <ArrowDown aria-hidden="true" />, accent: "#00a8ff", series: [...filtered].reverse().map((r) => (unit === "MBps" ? r.downloadMbps / 8 : r.downloadMbps)) },
+          { label: "Avg Upload", value: fmt(analytics.avgUl), trend: trends.ul, goodUp: true, icon: <ArrowUp aria-hidden="true" />, accent: "#a855f7", series: [...filtered].reverse().map((r) => (unit === "MBps" ? r.uploadMbps / 8 : r.uploadMbps)) },
+          { label: "Avg Ping", value: fmt(analytics.avgPing, false), trend: trends.ping, goodUp: false, icon: <Activity aria-hidden="true" />, accent: "#f59e0b", series: [...filtered].reverse().map((r) => r.idleLatencyMs) },
+          { label: "Avg Jitter", value: fmt(analytics.avgJit, false), trend: trends.jit, goodUp: false, icon: <GaugeIcon aria-hidden="true" />, accent: "#fb7185", series: [...filtered].reverse().map((r) => r.jitterMs) },
+        ]).map((c) => {
+          const good = c.trend === null ? null : (c.trend >= 0) === c.goodUp;
+          return (
+            <div key={c.label} className="np-card p-5">
+              <p className="flex items-center gap-2 text-sm np-muted"><span className="np-icon-chip" style={{ color: c.accent, background: `${c.accent}22` }}>{c.icon}</span>{c.label}</p>
+              <p className="mt-2 text-2xl font-bold">{all.length === 0 ? "—" : c.value}</p>
+              <p className="mt-1 text-xs" style={{ color: c.trend === null ? "var(--np-muted)" : good ? "#10b981" : "#ef4444" }}>
+                {c.trend === null ? "— vs previous period" : `${c.trend >= 0 ? "↑" : "↓"} ${Math.abs(c.trend).toFixed(1)}% vs previous period`}
+              </p>
+              {filtered.length >= 2 && <Sparkline values={c.series} color={c.accent} label={`${c.label} over time`} />}
+            </div>
+          );
+        })}
+        <div className="np-card p-5">
+          <p className="flex items-center gap-2 text-sm np-muted"><span className="np-icon-chip" style={{ color: "#00a8ff", background: "#00a8ff22" }}><BarChart3 aria-hidden="true" /></span>Total Tests</p>
+          <p className="mt-2 text-2xl font-bold">{all.length}</p>
+          <p className="mt-1 text-xs np-muted">First: {all.length ? new Date(all.at(-1)?.timestamp ?? "").toLocaleString() : "—"}</p>
+          <p className="text-xs np-muted">Last: {all.length ? new Date(all.at(0)?.timestamp ?? "").toLocaleString() : "—"}</p>
+        </div>
       </div>
-      <p className="text-xs np-muted">{datasetNote}. Period: {all.length ? `${new Date(all.at(-1)?.timestamp ?? "").toLocaleDateString()} → ${new Date(all.at(0)?.timestamp ?? "").toLocaleDateString()}` : "no tests yet"}.</p>
+      <p className="text-xs np-muted">{datasetNote}. Period: {all.length ? `${new Date(all.at(-1)?.timestamp ?? "").toLocaleDateString()} → ${new Date(all.at(0)?.timestamp ?? "").toLocaleDateString()}` : "no tests yet"}. Trends compare the current filtered period with the immediately preceding equal-length period from the same dataset; “—” means that previous period has no records.</p>
 
-      <section className="np-card p-5" aria-label="Historical chart">
+      <div className="grid gap-4 xl:grid-cols-12">
+      <section className="np-card p-5 xl:col-span-8" aria-label="Historical chart">
         <h2 className="font-semibold">Historical Performance</h2>
         <p className="text-xs np-muted">Download and upload over time, from stored records only.</p>
         <div className="mt-4 h-64">
@@ -195,9 +244,9 @@ export default function HistoryPage() {
         </div>
       </section>
 
-      <section className="np-card p-5" aria-label="Filters">
+      <section className="np-card p-5 xl:col-span-4" aria-label="Filters">
         <h2 className="font-semibold">Filters</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-3 grid gap-3">
           <div>
             <label htmlFor="hist-search" className="text-xs np-muted">Search</label>
             <input id="hist-search" value={draftSearch} onChange={(e) => setDraftSearch(e.target.value)} placeholder="Search ISP, server, IP…" className="np-input mt-1 w-full" />
@@ -219,10 +268,11 @@ export default function HistoryPage() {
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" onClick={applyFilters} className="np-btn-primary px-5 py-2 text-sm">Apply</button>
-          <button type="button" onClick={resetFilters} className="rounded-full border px-5 py-2 text-sm" style={{ borderColor: "var(--np-border)" }}>Reset</button>
+          <button type="button" onClick={applyFilters} className="np-btn-primary flex items-center gap-1.5 px-5 py-2 text-sm"><Filter className="h-4 w-4" aria-hidden="true" />Apply</button>
+          <button type="button" onClick={resetFilters} className="flex items-center gap-1.5 rounded-full border px-5 py-2 text-sm" style={{ borderColor: "var(--np-border)" }}><RotateCcw className="h-4 w-4" aria-hidden="true" />Reset</button>
         </div>
       </section>
+      </div>
 
       <section className="np-card p-5" aria-label="Test results">
         <div className="flex flex-wrap items-center justify-between gap-3">

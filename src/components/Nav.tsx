@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Moon, Sun, Zap } from "lucide-react";
+import { Moon, Sun, Activity } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 
 const LINKS = [
@@ -15,8 +15,10 @@ const LINKS = [
 /**
  * Premium application shell navigation (reference layout): logo left,
  * page links centre-left with a blue active pill, theme toggle right.
- * No profile control: this deployment has no accounts, so a decorative
- * avatar button would be a dead control. Mobile: links wrap below the
+ * Logo mark is a pulse line (Activity) in a blue gradient disc, closest
+ * Lucide match to the reference's waveform logo. No profile control:
+ * this deployment has no accounts, so a decorative avatar button would
+ * be a dead control. Mobile: links wrap below the
  * logo row instead of overflowing horizontally.
  */
 export function Nav() {
@@ -31,7 +33,7 @@ export function Nav() {
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
         <Link href="/" className="flex items-center gap-2 text-lg font-bold" aria-label="NetPulse home">
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#2563ff] to-[#00a8ff] text-white" aria-hidden="true">
-            <Zap className="h-4 w-4" />
+            <Activity className="h-4 w-4" />
           </span>
           NetPulse
         </Link>

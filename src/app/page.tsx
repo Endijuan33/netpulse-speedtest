@@ -26,9 +26,15 @@ import {
   ArrowDown,
   ArrowUp,
   Activity,
+  CheckCircle2,
   Gauge as GaugeIcon,
+  Globe,
   Loader2,
+  MapPin,
   Play,
+  RadioTower,
+  Server,
+  Signal,
   X,
 } from "lucide-react";
 
@@ -302,10 +308,15 @@ export default function Dashboard() {
       <div className="grid gap-4 xl:grid-cols-12">
         <section className="np-card p-5 xl:col-span-3" aria-label="Connection overview">
           <h2 className="text-sm font-semibold np-muted">Connection Overview</h2>
-          <p className="mt-3 text-lg font-bold">{info ? (info.isp ?? "ISP unknown") : (infoError ? "ISP unknown" : "Detecting…")}</p>
-          <p className="text-sm np-muted">{location || "Location unknown"}</p>
-          <div className="np-elevated mt-4 flex items-center justify-between p-3">
-            <span className="text-sm np-muted">Public IP</span>
+          <div className="mt-3 flex items-center gap-3">
+            <span className="np-icon-chip" style={{ color: "#00a8ff", background: "#00a8ff22" }}><RadioTower aria-hidden="true" /></span>
+            <div className="min-w-0">
+              <p className="truncate text-lg font-bold">{info ? (info.isp ?? "ISP unknown") : (infoError ? "ISP unknown" : "Detecting…")}</p>
+              <p className="flex items-center gap-1 text-sm np-muted"><MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />{location || "Location unknown"}</p>
+            </div>
+          </div>
+          <div className="np-elevated mt-4 flex items-center justify-between gap-2 p-3">
+            <span className="flex items-center gap-1.5 text-sm np-muted"><Globe className="h-4 w-4 text-[#00a8ff]" aria-hidden="true" />Public IP</span>
             <span className="font-mono text-sm font-semibold">{info?.ip ?? "—"}</span>
             {info?.ip && (
               <button type="button" className="rounded-md border px-2 py-1 text-xs" style={{ borderColor: "var(--np-border)" }} onClick={() => navigator.clipboard.writeText(info.ip ?? "").catch(() => undefined)} aria-label="Copy public IP">
@@ -318,14 +329,16 @@ export default function Dashboard() {
             <span className="text-sm np-muted">{running ? "A test is running." : "Connection is ready to test."}</span>
           </div>
           <dl className="mt-4 space-y-2 text-sm">
-            <div className="flex justify-between"><dt className="np-muted">Test server</dt><dd className="font-medium">{origin?.label ?? "Origin server"}</dd></div>
-            <div className="flex justify-between"><dt className="np-muted">Server region</dt><dd className="font-medium">Deployment region (iad1)</dd></div>
+            <div className="flex justify-between"><dt className="flex items-center gap-1.5 np-muted"><Server className="h-4 w-4 text-[#a855f7]" aria-hidden="true" />Test server</dt><dd className="font-medium">{origin?.label ?? "Origin server"}</dd></div>
+            <div className="flex justify-between"><dt className="flex items-center gap-1.5 np-muted"><MapPin className="h-4 w-4 text-[#f59e0b]" aria-hidden="true" />Server region</dt><dd className="font-medium">Deployment region (iad1)</dd></div>
+            <div className="flex justify-between"><dt className="flex items-center gap-1.5 np-muted"><Signal className="h-4 w-4 text-[#10b981]" aria-hidden="true" />Connection type</dt><dd className="font-medium">Browser estimate — see Network Info</dd></div>
           </dl>
           <p className="mt-3 text-xs np-muted">This deployment has a single origin test server; there is no fleet to choose from. Reference endpoints below are latency-only, not speedtest servers.</p>
         </section>
 
         <section className="np-card relative overflow-hidden p-6 xl:col-span-6" aria-label="Speedtest">
-          <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: "radial-gradient(ellipse at 50% 0%, #2563ff33, transparent 60%), radial-gradient(ellipse at 90% 100%, #a855f733, transparent 55%)" }} aria-hidden="true" />
+          <div className="np-stars" aria-hidden="true" />
+          <div className="np-earth" aria-hidden="true" />
           <div className="relative">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -379,7 +392,7 @@ export default function Dashboard() {
         </section>
 
         <section className="np-card p-5 xl:col-span-3" aria-label="Test server selector">
-          <h2 className="text-sm font-semibold np-muted">Test Server</h2>
+          <h2 className="flex items-center gap-2 text-sm font-semibold np-muted"><span className="np-icon-chip" style={{ color: "#00a8ff", background: "#00a8ff22" }}><Globe aria-hidden="true" /></span>Test Server</h2>
           <label className="mt-3 block text-xs np-muted" htmlFor="server-select">Selected test server</label>
           <select
             id="server-select"
@@ -400,7 +413,7 @@ export default function Dashboard() {
           <ul className="mt-2 space-y-2">
             {references.map((s) => (
               <li key={s.id} className="np-elevated flex items-center justify-between gap-2 p-2 text-sm">
-                <span>{s.label}</span>
+                <span className="flex items-center gap-2"><Globe className="h-4 w-4 shrink-0 text-[#00a8ff]" aria-hidden="true" />{s.label}</span>
                 <button type="button" className="shrink-0 rounded-full border px-2 py-1 text-xs" style={{ borderColor: "var(--np-border)" }} onClick={() => void measureReference(s.hostname)}>
                   {serverLat[s.hostname] ?? "Measure"}
                 </button>
@@ -416,7 +429,7 @@ export default function Dashboard() {
         <MetricCard icon={<ArrowDown aria-hidden="true" />} name="Download" value={result ? formatSpeed(result.downloadMbps, unit).replace(/ (Mbps|MB\/s)$/, "") : "—"} unit={unit === "MBps" ? "MB/s" : "Mbps"} accent="#00a8ff" samples={dlSamples.map((s) => (unit === "MBps" ? s.mbps / 8 : s.mbps))} sampleLabel="Download samples" />
         <MetricCard icon={<ArrowUp aria-hidden="true" />} name="Upload" value={result ? formatSpeed(result.uploadMbps, unit).replace(/ (Mbps|MB\/s)$/, "") : "—"} unit={unit === "MBps" ? "MB/s" : "Mbps"} accent="#a855f7" samples={ulSamples.map((s) => (unit === "MBps" ? s.mbps / 8 : s.mbps))} sampleLabel="Upload samples" />
         <MetricCard icon={<Activity aria-hidden="true" />} name="Ping" value={result ? String(result.idleLatencyMs) : "—"} unit="ms" accent="#f59e0b" />
-        <MetricCard icon={<GaugeIcon aria-hidden="true" />} name="Jitter" value={result ? String(result.jitterMs) : "—"} unit="ms" accent="#ef4444" />
+        <MetricCard icon={<GaugeIcon aria-hidden="true" />} name="Jitter" value={result ? String(result.jitterMs) : "—"} unit="ms" accent="#fb7185" />
       </div>
 
       {/* Row 3: realtime chart + live log */}
@@ -457,7 +470,7 @@ export default function Dashboard() {
           ) : (
             <ol className="mt-4 space-y-2 text-sm">
               {log.map((e, i) => (
-                <li key={i} className="flex gap-2"><span className="np-muted tabular-nums">{e.time}</span><span>{e.text}</span></li>
+                <li key={i} className="flex gap-2"><CheckCircle2 className="h-4 w-4 shrink-0 text-[#10b981]" aria-hidden="true" /><span className="np-muted tabular-nums">{e.time}</span><span>{e.text}</span></li>
               ))}
             </ol>
           )}

@@ -24,8 +24,18 @@ export function Sparkline({ values, color = "#00a8ff", label }: { values: number
   const min = Math.min(...values, 0);
   const range = max - min || 1;
   const pts = values.map((v, i) => `${(i / (values.length - 1)) * 100},${36 - ((v - min) / range) * 32}`).join(" ");
+  // Gradient area fill under the line, like the reference metric cards.
+  const gid = `spark-${label.replace(/[^a-zA-Z0-9]/g, "")}`;
+  const area = `${pts} 100,40 0,40`;
   return (
     <svg viewBox="0 0 100 40" className="mt-2 h-10 w-full" role="img" aria-label={label} preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.45" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points={area} fill={`url(#${gid})`} />
       <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
     </svg>
   );
@@ -35,7 +45,7 @@ export function MetricCard({ icon, name, value, unit, accent, samples, sampleLab
   return (
     <section className="np-card np-card-hover p-4" aria-label={name}>
       <div className="flex items-center gap-2 text-sm np-muted">
-        <span style={{ color: accent }}>{icon}</span>
+        <span className="np-icon-chip" style={{ color: accent, background: `${accent}22` }}>{icon}</span>
         <span>{name}</span>
       </div>
       <p className="mt-2 text-3xl font-bold tabular-nums">
@@ -56,10 +66,13 @@ export function StatusBadge({ tone, children }: { tone: "ok" | "warn" | "bad" | 
   );
 }
 
-export function InfoCard({ label, value, copy }: { label: string; value: string; copy?: string }) {
+export function InfoCard({ label, value, copy, icon, accent = "#00a8ff" }: { label: string; value: string; copy?: string; icon?: ReactNode; accent?: string }) {
   return (
-    <div className="np-elevated flex items-start justify-between gap-2 p-3">
-      <div className="min-w-0">
+    <div className="np-elevated flex items-start gap-3 p-3">
+      {icon && (
+        <span className="np-icon-chip" style={{ color: accent, background: `${accent}22` }}>{icon}</span>
+      )}
+      <div className="min-w-0 flex-1">
         <p className="text-xs np-muted">{label}</p>
         <p className="mt-0.5 break-all font-medium">{value}</p>
       </div>

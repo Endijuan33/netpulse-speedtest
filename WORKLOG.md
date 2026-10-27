@@ -166,3 +166,46 @@ All gates run in ~/workspace/netpulse, Node v24.22.1, pnpm 10.18.3.
   DNS-rebinding TOCTOU in SSRF guard; x-forwarded-for spoofing for rate
   limits; ip-api over plain HTTP (free tier); 200+ Mbps on a real Indonesian
   mobile link still only provable by the user's phone retest.
+
+## Visual polish round (background + icons) — after premium redesign
+- User re-sent the same 4 references: implementation still felt short on
+  background and icons. Cross-checked implementation screenshots (local prod
+  build, 1440 px) against the references, component by component.
+- Gaps found (before): dashboard had only faint radial gradients inside the
+  gauge card — no Earth, no top glow, flat navy elsewhere; Network InfoCards
+  and dashboard overview had NO icons at all; metric cards had tiny inline
+  icons with line-only sparklines (no gradient fill); history had only 4
+  analytics cards, no Total Tests card, no trend percentages, no
+  mini-sparklines, and chart/filters stacked instead of side-by-side;
+  diagnostics tabs/resolver rows/summary had no icons and no copy buttons
+  on resolved IPs; the Network map was a light OSM iframe that this app's
+  own CSP (default-src 'self', no frame-src) blocks in enforcing browsers —
+  that is why the agent-browser map showed "content blocked".
+- Fixes: page-wide ambient top glow on all pages (layout .np-ambient,
+  pointer-events none, static); dashboard CSS-only Earth limb + star field
+  behind the gauge (no image asset, no reference screenshot used, no layout
+  shift, reduced-motion safe); .np-icon-chip coloured tiles in MetricCard,
+  InfoCard, overview, server selector, diagnostics timing/summary, history
+  analytics; gradient-filled sparklines; live-log check icons; dark tile map
+  (CARTO dark_all, no new dependency, real tiles from provider coords,
+  working zoom +/-/recenter, attribution, tile-failure fallback to Open in
+  Maps) with a scoped CSP addition (img-src += basemaps.cartocdn.com);
+  history trends computed honestly in src/lib/trends.ts (current filtered
+  period vs preceding equal-length window, same dataset; "—" when the
+  previous window has no records) + Total Tests card + chart/filters in the
+  reference's side-by-side layout; diagnostics tab/resolver/summary icons
+  and copy buttons on resolved IPs.
+- Deliberately NOT reproduced: trademarked brand logos (neutral Lucide
+  glyphs instead, e.g. globe for browser, cloud/globe/shield for resolvers);
+  no profile avatar (no accounts — a decorative avatar would be a dead
+  control); no "nearest"/global-fleet claim; no simulated traceroute hops;
+  no country-flag emoji (rendering varies; country shown as text + pin);
+  dashboard overview/gauge/server columns keep the previous redesign's
+  merged layout rather than the reference's separate right-hand overview
+  column (same data, less churn, no feature risk).
+- Gates: typecheck 0 errors, lint 0 errors 0 warnings, Vitest 51/51
+  (incl. 5 new trends tests), production build success 0 warnings
+  (First Load: / 235 kB, /diagnostics 111 kB, /network 116 kB,
+  /history 232 kB, shared 103 kB), Playwright smoke 5/5 + regression 8/8,
+  overflow 0 px on all 4 pages at 1440/390 px. CARTO tile math verified
+  (Bekasi coords -> tile 3265/2119 @ z12, HTTP 200, 256x256 PNG).

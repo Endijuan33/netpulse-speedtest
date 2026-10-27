@@ -65,6 +65,89 @@ body {
 .np-card-hover:hover {
   border-color: #2563ff66;
 }
+/* Icon chip: coloured rounded tile behind an icon, matching the reference
+ * cards (blue/purple/amber/pink accents). The icon itself stays Lucide. */
+.np-icon-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border-radius: 0.625rem;
+}
+.np-icon-chip svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+/* Ambient page glow: subtle blue/purple light spilling from the top of the
+ * page, present on all four pages (the reference's deep-navy field is not
+ * flat). Static, pointer-transparent, and invisible to assistive tech. */
+.np-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 32% at 50% -6%, rgb(37 99 255 / 0.22), transparent 70%),
+    radial-gradient(ellipse 40% 26% at 88% 0%, rgb(168 85 247 / 0.14), transparent 70%),
+    radial-gradient(ellipse 36% 24% at 8% 0%, rgb(0 168 255 / 0.12), transparent 70%);
+}
+.dark .np-ambient {
+  background:
+    radial-gradient(ellipse 60% 32% at 50% -6%, rgb(37 99 255 / 0.28), transparent 70%),
+    radial-gradient(ellipse 40% 26% at 88% 0%, rgb(168 85 247 / 0.18), transparent 70%),
+    radial-gradient(ellipse 36% 24% at 8% 0%, rgb(0 168 255 / 0.16), transparent 70%);
+}
+/* Dashboard Earth glow: a CSS-only planet limb behind the gauge — a deep
+ * blue disc with a bright atmospheric rim and a faint star field. This is
+ * decoration, not the user's reference screenshot (never used as an image),
+ * and it is fully static so it cannot disturb measurements. */
+.np-earth {
+  position: absolute;
+  left: 50%;
+  top: -4.5rem;
+  width: 34rem;
+  height: 34rem;
+  max-width: 130%;
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  border-radius: 9999px;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 38% 30%, #1d4ed8 0%, #0b1e4b 42%, #050918 72%);
+  box-shadow:
+    0 0 0 1px rgb(0 168 255 / 0.25),
+    0 0 90px 18px rgb(37 99 255 / 0.35),
+    0 0 160px 40px rgb(0 168 255 / 0.18);
+  opacity: 0.85;
+}
+.np-earth::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background:
+    radial-gradient(circle at 62% 18%, rgb(147 197 253 / 0.35), transparent 42%),
+    radial-gradient(circle at 30% 72%, rgb(0 168 255 / 0.18), transparent 45%);
+}
+.np-stars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image:
+    radial-gradient(rgb(255 255 255 / 0.8) 1px, transparent 1.4px),
+    radial-gradient(rgb(147 197 253 / 0.7) 1px, transparent 1.4px);
+  background-size: 74px 74px, 118px 118px;
+  background-position: 0 0, 37px 53px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .np-earth,
+  .np-stars {
+    opacity: 0.5;
+  }
+}
 .np-elevated {
   background: var(--np-elevated);
   border: 1px solid var(--np-border);
